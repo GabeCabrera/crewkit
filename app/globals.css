@@ -1,0 +1,297 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   DESIGN SYSTEM: RESPONSIVE VARIABLES
+   ============================================================ */
+@layer base {
+  :root {
+    /* Colors */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+    
+    /* Responsive spacing system */
+    --page-padding-x: 1rem;
+    --page-padding-y: 1.5rem;
+    --section-gap: 1.25rem;
+    --card-padding: 1rem;
+    --header-height: 3.5rem;
+    --sidebar-width: 0px;
+    --nav-bottom-spacing: 6rem;
+  }
+  
+  /* Tablet breakpoint (md: 768px) */
+  @media (min-width: 768px) {
+    :root {
+      --page-padding-x: 1.5rem;
+      --page-padding-y: 2rem;
+      --section-gap: 1.5rem;
+      --card-padding: 1.25rem;
+      --header-height: 4rem;
+    }
+  }
+  
+  /* Desktop breakpoint (lg: 1024px) */
+  @media (min-width: 1024px) {
+    :root {
+      --page-padding-x: 2rem;
+      --page-padding-y: 2rem;
+      --section-gap: 1.5rem;
+      --card-padding: 1.5rem;
+      --sidebar-width: 16rem;
+      --nav-bottom-spacing: 2rem;
+    }
+  }
+  
+  /* Large desktop (xl: 1280px) */
+  @media (min-width: 1280px) {
+    :root {
+      --page-padding-x: 3rem;
+    }
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 221.2 83.2% 53.3%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+@layer utilities {
+  /* Scrollbar utilities */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Page container using CSS variables */
+  .page-container {
+    padding-left: var(--page-padding-x);
+    padding-right: var(--page-padding-x);
+    padding-top: var(--page-padding-y);
+    padding-bottom: var(--nav-bottom-spacing);
+  }
+  
+  /* Section spacing */
+  .section-gap {
+    gap: var(--section-gap);
+  }
+  
+  /* Responsive text utilities */
+  .text-page-title {
+    @apply text-2xl font-bold tracking-tight;
+  }
+  @media (min-width: 768px) {
+    .text-page-title {
+      @apply text-3xl;
+    }
+  }
+  
+  .text-page-subtitle {
+    @apply text-sm text-muted-foreground;
+  }
+  @media (min-width: 768px) {
+    .text-page-subtitle {
+      @apply text-base;
+    }
+  }
+  
+  /* Card padding utility */
+  .card-responsive {
+    padding: var(--card-padding);
+  }
+  
+  /* Hide on mobile, show on tablet+ */
+  .hide-mobile {
+    @apply hidden md:block;
+  }
+  
+  /* Show on mobile, hide on tablet+ */
+  .show-mobile {
+    @apply block md:hidden;
+  }
+  
+  /* Responsive table wrapper - adds horizontal scroll on mobile */
+  .table-responsive {
+    @apply w-full overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0;
+  }
+  
+  /* Safe area padding for mobile devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  /* Touch-friendly minimum tap target */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Skeleton fade animations */
+@keyframes skeleton-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Content fade in with slight lift */
+@keyframes content-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.skeleton-fade-in {
+  animation: skeleton-fade-in 0.15s ease-out forwards;
+}
+
+.content-fade-in {
+  animation: content-fade-in 0.25s ease-out forwards;
+}
+
+.slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+/* ============================================================
+   COMPONENT OVERRIDES FOR RESPONSIVENESS
+   ============================================================ */
+
+/* Dialog/Modal - Full screen on mobile, centered on desktop */
+@media (max-width: 639px) {
+  [role="dialog"] {
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* Table cell text truncation on mobile */
+@media (max-width: 767px) {
+  .table-cell-truncate {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Card hover effects - only on devices with hover capability */
+@media (hover: hover) {
+  .card-hover:hover {
+    @apply shadow-md;
+    transform: translateY(-1px);
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,221 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  FIELD
+}
+
+enum UnitType {
+  UNIT
+  BOX
+  CASE
+  PALLET
+  FOOT
+  YARD
+  POUND
+  OTHER
+}
+
+
+enum AssemblyStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  password      String
+  role          UserRole @default(FIELD)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  teamId        String?
+  team          Team?    @relation(fields: [teamId], references: [id])
+  equipmentLogs EquipmentLog[]
+  assemblies    Assembly[]
+  assemblyUsageLogs AssemblyUsageLog[]
+  createdTeams  Team[]   @relation("TeamCreator")
+  createdReports EndOfDayReport[] @relation("ReportCreator")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  creatorId String
+  creator   User     @relation("TeamCreator", fields: [creatorId], references: [id])
+  members   User[]
+  reports   EndOfDayReport[]
+}
+
+model Equipment {
+  id            String    @id @default(cuid())
+  name          String
+  sku           String    @unique
+  description   String?
+  pricePerUnit  Float     @default(0)
+  unitType      UnitType  @default(UNIT)
+  photoUrl      String?
+  boxheroId     Int?      @unique
+  lastSyncedAt  DateTime?
+  isArchived    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  inventory     Inventory?
+  assemblyItems AssemblyItem[]
+  equipmentLogs EquipmentLog[]
+}
+
+model Inventory {
+  id          String   @id @default(cuid())
+  equipmentId String   @unique
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  quantity    Int      @default(0)
+  updatedAt   DateTime @updatedAt
+}
+
+model Assembly {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  status      AssemblyStatus  @default(DRAFT)
+  categories  String[]        @default([])
+  createdById String
+  createdBy   User            @relation(fields: [createdById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       AssemblyItem[]
+  usageLogs   AssemblyUsageLog[]
+}
+
+model AssemblyItem {
+  id         String   @id @default(cuid())
+  assemblyId String
+  assembly   Assembly @relation(fields: [assemblyId], references: [id], onDelete: Cascade)
+  equipmentId String
+  equipment  Equipment @relation(fields: [equipmentId], references: [id])
+  quantity   Int
+  createdAt  DateTime @default(now())
+}
+
+model AssemblyUsageLog {
+  id         String   @id @default(cuid())
+  assemblyId String
+  assembly   Assembly @relation(fields: [assemblyId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  quantity   Int      @default(1)
+  modifiers  Json?    // Store extra equipment as JSON
+  date       DateTime @default(now())
+  createdAt  DateTime @default(now())
+}
+
+model EquipmentLog {
+  id          String   @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  quantity    Int      // Positive for add, negative for remove
+  type        String   // "ADD", "REMOVE", "USED", "RETURNED"
+  notes       String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model EndOfDayReport {
+  id            String   @id @default(cuid())
+  date          DateTime @db.Date
+  teamId        String
+  team          Team     @relation(fields: [teamId], references: [id])
+  createdById   String
+  createdBy     User     @relation("ReportCreator", fields: [createdById], references: [id])
+  
+  // Manager selects who worked
+  workersPresent  String[]  // Array of user IDs
+  
+  // Auto-calculated summaries (stored for historical record)
+  totalAssembliesUsed  Int
+  totalItemsConsumed   Int
+  totalFiberFootage    Float?
+  
+  // Manager input
+  notes         String?
+  issues        String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Field work logs for this report
+  fieldWorkLogs FieldWorkLog[]
+  
+  @@unique([date, teamId])  // One report per team per day
+}
+
+// Detailed field work log for construction activities
+model FieldWorkLog {
+  id              String   @id @default(cuid())
+  
+  // Basic info
+  date            DateTime @db.Date
+  location        String              // Where work was performed
+  workersNames    String[]            // Names of workers (stored as strings for flexibility)
+  workerCount     Int       @default(0)
+  hoursWorked     Float     @default(0)
+  
+  // Aerial construction metrics
+  strandHungFootage     Float?    // Strand hung (feet)
+  polesAttached         Int?      // Number of poles attached to
+  fiberLashedFootage    Float?    // Fiber lashed (feet)
+  fiberPulledFootage    Float?    // Fiber pulled (feet)
+  
+  // Underground construction metrics
+  drilledFootage        Float?    // Directional drilling (feet)
+  plowedFootage         Float?    // Plowed conduit (feet)
+  trenchedFootage       Float?    // Open trench (feet)
+  conduitPlacedFootage  Float?    // Conduit placed (feet)
+  conduitSize           String?   // Conduit size (e.g., "1.25\"", "2\"")
+  
+  // Infrastructure placed
+  handholesPlaced       Int?      // Handholes placed
+  vaultsPlaced          Int?      // Vaults placed
+  mstsInstalled         Int?      // MSTs (Mid-Span Terminals) installed
+  guysPlaced            Int?      // Guy wires/anchors placed
+  slackLoops            Int?      // Slack loops installed
+  risersInstalled       Int?      // Risers installed
+  spliceCases           Int?      // Splice cases installed
+  anchorsPlaced         Int?      // Anchors placed
+  snowshoesPlaced       Int?      // Snowshoes placed
+  
+  // Notes
+  notes           String?
+  submittedBy     String              // Name of person who submitted
+  
+  // Optional link to EOD report
+  reportId        String?
+  report          EndOfDayReport? @relation(fields: [reportId], references: [id])
+  
+  // Original timestamp from import
+  originalTimestamp DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([date])
+  @@index([location])
+}
