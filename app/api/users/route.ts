@@ -8,10 +8,15 @@ import bcrypt from "bcryptjs";
 
 export const dynamic = 'force-dynamic';
 
+// Helper to check if user has admin-level access
+function hasAdminAccess(role: string): boolean {
+  return role === "SUPERUSER" || role === "ADMIN";
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session || !hasAdminAccess(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -44,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "ADMIN") {
+    if (!session || !hasAdminAccess(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -60,6 +65,22 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, name, password, role, teamId } = validation.data;
+
+    // Only SUPERUSER can create ADMIN or SUPERUSER accounts
+    if ((role === "ADMIN" || role === "SUPERUSER") && session.user.role !== "SUPERUSER") {
+      return NextResponse.json(
+        { error: "Only superusers can create admin accounts" },
+        { status: 403 }
+      );
+    }
+
+    // No one can create SUPERUSER except existing SUPERUSER
+    if (role === "SUPERUSER" && session.user.role !== "SUPERUSER") {
+      return NextResponse.json(
+        { error: "Only superusers can create superuser accounts" },
+        { status: 403 }
+      );
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 

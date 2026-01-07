@@ -14,8 +14,8 @@ export const createUserSchema = z.object({
     .string()
     .min(8, "Password must be at least 8 characters")
     .max(100, "Password too long"),
-  role: z.enum(["ADMIN", "MANAGER", "FIELD"], {
-    errorMap: () => ({ message: "Role must be ADMIN, MANAGER, or FIELD" }),
+  role: z.enum(["SUPERUSER", "ADMIN", "MANAGER", "FIELD"], {
+    errorMap: () => ({ message: "Role must be SUPERUSER, ADMIN, MANAGER, or FIELD" }),
   }),
   teamId: z.string().cuid().optional().nullable(),
 });
@@ -24,7 +24,7 @@ export const updateUserSchema = z.object({
   email: z.string().email("Invalid email format").optional(),
   name: z.string().min(1).max(100).optional(),
   password: z.string().min(8).max(100).optional(),
-  role: z.enum(["ADMIN", "MANAGER", "FIELD"]).optional(),
+  role: z.enum(["SUPERUSER", "ADMIN", "MANAGER", "FIELD"]).optional(),
   teamId: z.string().cuid().optional().nullable(),
 });
 

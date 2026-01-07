@@ -6,6 +6,11 @@ import bcrypt from "bcryptjs";
 
 export const dynamic = 'force-dynamic';
 
+// Helper to check if user has admin-level access
+function hasAdminAccess(role: string): boolean {
+  return role === "SUPERUSER" || role === "ADMIN";
+}
+
 // GET /api/users/[id] - Get a single user
 export async function GET(
   request: NextRequest,
@@ -22,7 +27,7 @@ export async function GET(
       select: { role: true },
     });
 
-    if (!currentUser || currentUser.role !== "ADMIN") {
+    if (!currentUser || !hasAdminAccess(currentUser.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
@@ -58,7 +63,7 @@ export async function GET(
   }
 }
 
-// PUT /api/users/[id] - Update a user (Admin only)
+// PUT /api/users/[id] - Update a user
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -74,18 +79,60 @@ export async function PUT(
       select: { role: true },
     });
 
-    if (!currentUser || currentUser.role !== "ADMIN") {
+    if (!currentUser || !hasAdminAccess(currentUser.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
+
+    // Get the target user to check their role
+    const targetUser = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { role: true },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // SUPERUSER protection: only SUPERUSER can edit SUPERUSER accounts
+    if (targetUser.role === "SUPERUSER" && currentUser.role !== "SUPERUSER") {
+      return NextResponse.json(
+        { error: "Only superusers can modify superuser accounts" },
+        { status: 403 }
+      );
+    }
+
+    // ADMIN protection: regular ADMINs cannot edit other ADMINs
+    if (targetUser.role === "ADMIN" && currentUser.role === "ADMIN" && params.id !== session.user.id) {
+      return NextResponse.json(
+        { error: "Admins cannot modify other admin accounts" },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
     const { name, email, role, teamId, password } = body;
 
+    // Prevent role escalation
+    if (role === "SUPERUSER" && currentUser.role !== "SUPERUSER") {
+      return NextResponse.json(
+        { error: "Only superusers can assign superuser role" },
+        { status: 403 }
+      );
+    }
+
+    // Regular ADMIN cannot promote users to ADMIN
+    if (role === "ADMIN" && currentUser.role !== "SUPERUSER") {
+      return NextResponse.json(
+        { error: "Only superusers can assign admin role" },
+        { status: 403 }
+      );
+    }
+
     // Build update data
     const updateData: {
       name?: string;
       email?: string;
-      role?: "ADMIN" | "MANAGER" | "FIELD";
+      role?: "SUPERUSER" | "ADMIN" | "MANAGER" | "FIELD";
       teamId?: string | null;
       password?: string;
     } = {};
@@ -127,7 +174,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/users/[id] - Delete a user (Admin only)
+// DELETE /api/users/[id] - Delete a user
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -143,13 +190,39 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (!currentUser || currentUser.role !== "ADMIN") {
+    if (!currentUser || !hasAdminAccess(currentUser.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
     // Prevent deleting yourself
     if (params.id === session.user.id) {
       return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 });
+    }
+
+    // Get the target user to check their role
+    const targetUser = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { role: true },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // SUPERUSER protection: only SUPERUSER can delete SUPERUSER accounts
+    if (targetUser.role === "SUPERUSER" && currentUser.role !== "SUPERUSER") {
+      return NextResponse.json(
+        { error: "Only superusers can delete superuser accounts" },
+        { status: 403 }
+      );
+    }
+
+    // ADMIN protection: regular ADMINs cannot delete other ADMINs
+    if (targetUser.role === "ADMIN" && currentUser.role === "ADMIN") {
+      return NextResponse.json(
+        { error: "Admins cannot delete other admin accounts" },
+        { status: 403 }
+      );
     }
 
     await prisma.user.delete({
@@ -165,4 +238,3 @@ export async function DELETE(
     );
   }
 }
-

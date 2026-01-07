@@ -7,11 +7,13 @@ export default withAuth(
     const pathname = req.nextUrl.pathname;
 
     // Role-based route protection
-    if (pathname.startsWith("/admin") && token?.role !== "ADMIN") {
+    // SUPERUSER and ADMIN can access admin routes
+    if (pathname.startsWith("/admin") && !["SUPERUSER", "ADMIN"].includes(token?.role as string)) {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
-    if (pathname.startsWith("/manager") && !["ADMIN", "MANAGER"].includes(token?.role as string)) {
+    // SUPERUSER, ADMIN, and MANAGER can access manager routes
+    if (pathname.startsWith("/manager") && !["SUPERUSER", "ADMIN", "MANAGER"].includes(token?.role as string)) {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
