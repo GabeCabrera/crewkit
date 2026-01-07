@@ -121,6 +121,7 @@ export function Sidebar() {
 
   const getNavItems = (): NavItem[] => {
     switch (role) {
+      case "SUPERUSER":
       case "ADMIN":
         return [
           { href: "/admin", icon: Home, label: "Dashboard" },

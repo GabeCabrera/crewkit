@@ -35,6 +35,7 @@ export function FloatingNav({ isOpen, onOpenChange }: FloatingNavProps) {
     let allItems: NavItem[] = [];
     
     switch (role) {
+      case "SUPERUSER":
       case "ADMIN":
         allItems = [
           { href: "/admin", icon: Home, label: "Dashboard" },
@@ -266,6 +267,7 @@ export function getSecondaryNavItems(role: string): NavItem[] {
   let allItems: NavItem[] = [];
   
   switch (role) {
+    case "SUPERUSER":
     case "ADMIN":
       allItems = [
         { href: "/admin", icon: Home, label: "Dashboard" },

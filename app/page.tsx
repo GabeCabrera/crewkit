@@ -10,7 +10,7 @@ export default async function Home() {
   }
 
   // Redirect based on role
-  if (session.user.role === "ADMIN") {
+  if (session.user.role === "SUPERUSER" || session.user.role === "ADMIN") {
     redirect("/admin");
   } else if (session.user.role === "MANAGER") {
     redirect("/manager");
