@@ -173,7 +173,7 @@ export default function AdminDashboard() {
   // Generate month options for selector
   const getMonthOptions = () => {
     const options = [
-      { value: "all", label: "📊 All Time" },
+      { value: "all", label: "All Time" },
       { value: "current", label: "This Month" },
     ];
     const now = new Date();
