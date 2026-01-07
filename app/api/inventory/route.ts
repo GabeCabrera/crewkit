@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Only Admin and Manager can directly modify inventory
-    if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    if (!["ADMIN", "SUPERUSER", "MANAGER"].includes(session.user.role)) {
       return NextResponse.json(
         { error: "Only managers and admins can directly modify inventory" },
         { status: 403 }

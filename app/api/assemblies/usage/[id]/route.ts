@@ -47,7 +47,7 @@ export async function DELETE(
       select: { role: true },
     });
 
-    if (usageLog.userId !== session.user.id && currentUser?.role !== "ADMIN") {
+    if (usageLog.userId !== session.user.id && !["ADMIN", "SUPERUSER"].includes(currentUser?.role || "")) {
       return NextResponse.json(
         { error: "You can only delete your own usage logs" },
         { status: 403 }

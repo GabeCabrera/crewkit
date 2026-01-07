@@ -21,7 +21,7 @@ export async function PUT(
       select: { role: true },
     });
 
-    if (!user || user.role !== "ADMIN") {
+    if (!user || !["ADMIN", "SUPERUSER"].includes(user.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 

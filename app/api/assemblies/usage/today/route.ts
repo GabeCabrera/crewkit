@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     };
 
     // If not admin/manager viewing all, only show own logs
-    if (!allUsers || (session.user.role !== "ADMIN" && session.user.role !== "MANAGER")) {
+    if (!allUsers || !["ADMIN", "SUPERUSER", "MANAGER"].includes(session.user.role)) {
       where.userId = userId || session.user.id;
     }
 

@@ -24,9 +24,9 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Admin sees all teams, Manager sees only their team
+    // Admin/Superuser sees all teams, Manager sees only their team
     let teams;
-    if (user.role === "ADMIN") {
+    if (user.role === "ADMIN" || user.role === "SUPERUSER") {
       teams = await prisma.team.findMany({
         include: {
           members: {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       select: { role: true },
     });
 
-    if (!user || user.role !== "ADMIN") {
+    if (!user || !["ADMIN", "SUPERUSER"].includes(user.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 

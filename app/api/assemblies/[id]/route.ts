@@ -67,7 +67,7 @@ export async function PUT(
     // Admin: Full access to all assemblies
     // Manager: Can edit any assembly and approve/reject
     // Field: Can only edit their own drafts or rejected assemblies
-    if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    if (!["ADMIN", "SUPERUSER", "MANAGER"].includes(session.user.role)) {
       // Field users can only edit their own drafts
       const existing = await prisma.assembly.findUnique({
         where: { id: params.id },
@@ -184,7 +184,7 @@ export async function DELETE(
     // Admin: Can delete any assembly
     // Manager: Can delete any assembly
     // Field: Can only delete their own drafts
-    if (session.user.role !== "ADMIN" && session.user.role !== "MANAGER") {
+    if (!["ADMIN", "SUPERUSER", "MANAGER"].includes(session.user.role)) {
       const existing = await prisma.assembly.findUnique({
         where: { id: params.id },
       });

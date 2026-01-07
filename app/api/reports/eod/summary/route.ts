@@ -28,12 +28,12 @@ export async function GET(request: NextRequest) {
 
     // Determine team
     let teamId: string | null = null;
-    if (user.role === "ADMIN" && teamIdParam) {
+    if ((user.role === "ADMIN" || user.role === "SUPERUSER") && teamIdParam) {
       teamId = teamIdParam;
     } else if (user.role === "MANAGER") {
       teamId = user.teamId;
-    } else if (user.role === "ADMIN" && !teamIdParam) {
-      // Admin without team filter - get all teams
+    } else if ((user.role === "ADMIN" || user.role === "SUPERUSER") && !teamIdParam) {
+      // Admin/Superuser without team filter - get all teams
       teamId = null;
     }
 

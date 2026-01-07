@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Only admins can access BoxHero data
-    if (session.user.role !== "ADMIN") {
+    if (!["ADMIN", "SUPERUSER"].includes(session.user.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

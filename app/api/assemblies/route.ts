@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     let assemblyStatus = status || "DRAFT";
     if (session.user.role === "MANAGER" && !status) {
       assemblyStatus = "PENDING_APPROVAL";
-    } else if (session.user.role === "ADMIN" && !status) {
+    } else if ((session.user.role === "ADMIN" || session.user.role === "SUPERUSER") && !status) {
       assemblyStatus = "APPROVED";
     }
 

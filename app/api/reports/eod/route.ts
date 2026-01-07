@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       select: { role: true, teamId: true },
     });
 
-    if (!user || (user.role !== "MANAGER" && user.role !== "ADMIN")) {
+    if (!user || !["MANAGER", "ADMIN", "SUPERUSER"].includes(user.role)) {
       return NextResponse.json({ error: "Manager or Admin access required" }, { status: 403 });
     }
 
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Determine which team to use
-    const reportTeamId = user.role === "ADMIN" && teamId ? teamId : user.teamId;
+    const reportTeamId = (user.role === "ADMIN" || user.role === "SUPERUSER") && teamId ? teamId : user.teamId;
 
     if (!reportTeamId) {
       return NextResponse.json({ error: "Team ID is required" }, { status: 400 });
