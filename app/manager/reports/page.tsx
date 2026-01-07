@@ -246,7 +246,7 @@ function TodayOverviewTab() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-emerald-100">Today's Cost</p>
+                <p className="text-sm text-emerald-100">Today&apos;s Cost</p>
                 <p className="text-3xl font-bold">{formatCurrency(summary?.totalCost || 0)}</p>
               </div>
               <DollarSign className="h-10 w-10 text-emerald-300" />
@@ -272,7 +272,7 @@ function TodayOverviewTab() {
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Layers className="h-4 w-4 text-blue-500" />
-              Today's Assembly Usage
+              Today&apos;s Assembly Usage
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={fetchData}>
               <RefreshCw className="h-4 w-4" />
@@ -905,7 +905,7 @@ function SubmitLogTab() {
     <Card className="border-0 shadow-sm max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-500" />Submit Daily Work Log</CardTitle>
-        <CardDescription>Record today's construction progress and crew activity</CardDescription>
+        <CardDescription>Record today&apos;s construction progress and crew activity</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">

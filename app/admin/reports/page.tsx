@@ -258,7 +258,7 @@ function TodayActivityTab() {
       {/* Usage Logs */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
-          <CardTitle className="text-base">Today's Usage Logs</CardTitle>
+          <CardTitle className="text-base">Today&apos;s Usage Logs</CardTitle>
           <Button variant="ghost" size="sm" onClick={fetchTodayUsage}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -904,7 +904,7 @@ function SubmitReportTab() {
     <Card className="border-0 shadow-sm max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-500" />Submit Daily Work Log</CardTitle>
-        <CardDescription>Record today's construction progress and crew activity</CardDescription>
+        <CardDescription>Record today&apos;s construction progress and crew activity</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">

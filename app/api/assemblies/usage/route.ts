@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { assemblyId, quantity, modifiers } = validation.data;
+    const { assemblyId, quantity = 1, modifiers } = validation.data;
 
     // Verify assembly exists and is approved
     const assembly = await prisma.assembly.findUnique({
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         assemblyId,
         userId: session.user.id,
         quantity,
-        modifiers: modifiers || null,
+        ...(modifiers && { modifiers }),
       },
     });
 

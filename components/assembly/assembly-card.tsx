@@ -166,6 +166,7 @@ export function AssemblyCard({
                   >
                     <div className="flex items-center gap-2">
                       {item.equipment.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img 
                           src={item.equipment.photoUrl} 
                           alt={item.equipment.name}

@@ -126,6 +126,7 @@ export function GlobalSearch({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, results, selectedIndex]);
 
   // Reset selected index when results change

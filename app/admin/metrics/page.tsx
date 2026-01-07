@@ -44,6 +44,7 @@ export default function MetricsPage() {
 
   useEffect(() => {
     fetchMetrics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   const fetchMetrics = async () => {

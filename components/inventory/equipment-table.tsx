@@ -86,6 +86,7 @@ function EquipmentCard({
       {/* Photo */}
       <div className="shrink-0">
         {item.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img 
             src={item.photoUrl} 
             alt={item.name}
@@ -433,6 +434,7 @@ export function EquipmentTable({
                           </TableCell>
                           <TableCell>
                             {item.photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
                               <img 
                                 src={item.photoUrl} 
                                 alt={item.name}

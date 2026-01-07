@@ -39,6 +39,7 @@ function AnimatedNumber({ value, duration = 500 }: { value: number; duration?: n
     };
 
     requestAnimationFrame(animate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, duration]);
 
   return <>{displayValue.toLocaleString()}</>;
@@ -66,6 +67,7 @@ function AnimatedCurrency({ value, duration = 500 }: { value: number; duration?:
     };
 
     requestAnimationFrame(animate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, duration]);
 
   return <>{formatCurrency(displayValue)}</>;

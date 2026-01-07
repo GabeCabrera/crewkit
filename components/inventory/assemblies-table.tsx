@@ -356,6 +356,7 @@ export function AssembliesTable({
       name: `${assembly.name} (Copy)`,
       description: assembly.description || "",
       status: "DRAFT" as Assembly["status"], // New copies start as draft
+      categories: [],
     });
     setItems([
       ...assembly.items.map(item => ({

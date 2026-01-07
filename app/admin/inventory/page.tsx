@@ -138,6 +138,7 @@ export default function InventoryPage() {
     if (!loading) {
       fetchEquipment(1, debouncedSearch);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
   // Keyboard shortcut for global search

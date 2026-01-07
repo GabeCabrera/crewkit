@@ -69,6 +69,7 @@ function EquipmentItem({
         {/* Thumbnail - always show consistently */}
         <div className="relative shrink-0">
           {eq.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img 
               src={eq.photoUrl} 
               alt="" 
@@ -205,6 +206,7 @@ export function EquipmentCombobox({
           ) : selectedEquipment ? (
             <div className="flex items-center gap-2 truncate">
               {selectedEquipment.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img 
                   src={selectedEquipment.photoUrl} 
                   alt="" 
