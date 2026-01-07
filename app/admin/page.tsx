@@ -20,6 +20,10 @@ import {
   CalendarDays,
   Wrench,
   MapPin,
+  BarChart3,
+  Gauge,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
@@ -61,6 +65,25 @@ interface MetricsData {
   spliceCases: number;
 }
 
+interface TrendData {
+  month: string;
+  strandHung: number;
+  fiberLashed: number;
+  hoursWorked: number;
+  logs: number;
+  fiberPulled?: number;
+  drilled?: number;
+  plowed?: number;
+  poles?: number;
+  msts?: number;
+  risers?: number;
+  spliceCases?: number;
+  handholes?: number;
+  vaults?: number;
+  guys?: number;
+  slackLoops?: number;
+}
+
 interface DashboardData {
   period: {
     current: { start: string; end: string; label: string };
@@ -70,6 +93,7 @@ interface DashboardData {
     current: MetricsData;
     previous: MetricsData;
     deltas: Record<string, number>;
+    averages: MetricsData | null;
   };
   productivity: {
     uniqueWorkers: number;
@@ -82,7 +106,7 @@ interface DashboardData {
     delta: number;
     today: number;
   };
-  trends: { month: string; strandHung: number; fiberLashed: number; hoursWorked: number; logs: number }[];
+  trends: TrendData[];
   recentLogs: {
     id: string;
     date: string;
@@ -97,6 +121,19 @@ interface DashboardData {
   }[];
   todayUsage: { id: string; assemblyName: string; quantity: number; userName: string; createdAt: string }[];
   systemStats: { equipment: number; assemblies: number; users: number; teams: number };
+  isAllTime?: boolean;
+  monthsWithData?: number | null;
+}
+
+// Small helper component for average stats
+function AverageCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50">
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-lg font-bold text-slate-900">{value}</p>
+      <p className="text-xs text-violet-600 mt-1">per month</p>
+    </div>
+  );
 }
 
 export default function AdminDashboard() {
@@ -135,7 +172,10 @@ export default function AdminDashboard() {
 
   // Generate month options for selector
   const getMonthOptions = () => {
-    const options = [{ value: "current", label: "This Month" }];
+    const options = [
+      { value: "all", label: "📊 All Time" },
+      { value: "current", label: "This Month" },
+    ];
     const now = new Date();
     for (let i = 1; i <= 11; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -145,6 +185,8 @@ export default function AdminDashboard() {
     }
     return options;
   };
+
+  const isAllTimeView = selectedMonth === "all";
 
   const quickActions = [
     { href: "/admin/inventory", icon: Package, label: "Inventory", description: "Equipment & assemblies", color: "from-blue-500 to-blue-600" },
@@ -204,12 +246,20 @@ export default function AdminDashboard() {
         <div className="px-4 py-4 sm:px-6 sm:py-5 max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center">
-                <Activity className="h-5 w-5 text-white" />
+              <div className={cn(
+                "h-10 w-10 rounded-xl bg-gradient-to-br flex items-center justify-center",
+                isAllTimeView ? "from-violet-600 to-indigo-700" : "from-slate-900 to-slate-700"
+              )}>
+                {isAllTimeView ? <BarChart3 className="h-5 w-5 text-white" /> : <Activity className="h-5 w-5 text-white" />}
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Command Center</h1>
-                <p className="text-slate-500 text-sm hidden sm:block">{data.period.current.label}</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                  {isAllTimeView ? "Analytics Overview" : "Command Center"}
+                </h1>
+                <p className="text-slate-500 text-sm hidden sm:block">
+                  {data.period.current.label}
+                  {data.monthsWithData && ` • ${data.monthsWithData} months of data`}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -238,32 +288,32 @@ export default function AdminDashboard() {
         {/* Hero KPI Row */}
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <MetricCard
-            title="Strand Hung"
+            title={isAllTimeView ? "Total Strand Hung" : "Strand Hung"}
             value={`${formatNumber(m.strandHungFootage)} ft`}
-            delta={d.strandHungFootage}
+            delta={isAllTimeView ? undefined : d.strandHungFootage}
             icon={Cable}
             variant="warning"
             size="large"
           />
           <MetricCard
-            title="Fiber Installed"
+            title={isAllTimeView ? "Total Fiber" : "Fiber Installed"}
             value={`${formatNumber(totalFiber)} ft`}
-            delta={(d.fiberLashedFootage + d.fiberPulledFootage) / 2}
+            delta={isAllTimeView ? undefined : (d.fiberLashedFootage + d.fiberPulledFootage) / 2}
             icon={TrendingUp}
             variant="success"
             size="large"
           />
           <MetricCard
-            title="Hours Worked"
+            title={isAllTimeView ? "Total Hours" : "Hours Worked"}
             value={formatNumber(m.hoursWorked)}
-            delta={d.hoursWorked}
+            delta={isAllTimeView ? undefined : d.hoursWorked}
             subtitle={`${m.totalLogs} logs`}
             icon={Clock}
             variant="primary"
             size="large"
           />
           <MetricCard
-            title="Infrastructure"
+            title={isAllTimeView ? "Total Infrastructure" : "Infrastructure"}
             value={formatNumber(totalInfrastructure)}
             subtitle="items placed"
             icon={Wrench}
@@ -271,15 +321,15 @@ export default function AdminDashboard() {
             size="large"
           />
           <MetricCard
-            title="Equipment Cost"
+            title={isAllTimeView ? "Total Equipment Cost" : "Equipment Cost"}
             value={formatCurrency(cost.current)}
-            delta={cost.delta}
+            delta={isAllTimeView ? undefined : cost.delta}
             icon={DollarSign}
             variant="dark"
             size="large"
           />
           <MetricCard
-            title="Active Crew"
+            title={isAllTimeView ? "Total Crew" : "Active Crew"}
             value={productivity.uniqueWorkers}
             subtitle="unique workers"
             icon={Users}
@@ -288,10 +338,39 @@ export default function AdminDashboard() {
           />
         </div>
 
+        {/* Monthly Averages Section - Only shown in All Time view */}
+        {isAllTimeView && metrics.averages && (
+          <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-6 border border-violet-100">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+                <Gauge className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Monthly Averages</h2>
+                <p className="text-sm text-slate-500">Average performance per month across all time</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              <AverageCard label="Strand Hung" value={`${formatNumber(metrics.averages.strandHungFootage)} ft`} />
+              <AverageCard label="Fiber Lashed" value={`${formatNumber(metrics.averages.fiberLashedFootage)} ft`} />
+              <AverageCard label="Fiber Pulled" value={`${formatNumber(metrics.averages.fiberPulledFootage)} ft`} />
+              <AverageCard label="Hours Worked" value={formatNumber(metrics.averages.hoursWorked)} />
+              <AverageCard label="Work Logs" value={formatNumber(metrics.averages.totalLogs)} />
+              <AverageCard label="Poles Attached" value={formatNumber(metrics.averages.polesAttached)} />
+              <AverageCard label="Drilled" value={`${formatNumber(metrics.averages.drilledFootage)} ft`} />
+            </div>
+          </div>
+        )}
+
         {/* Trends Section */}
-        <div className="grid lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-1 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Monthly Trends</h3>
+        <div className={cn("grid gap-6", isAllTimeView ? "lg:grid-cols-2" : "lg:grid-cols-4")}>
+          <div className={cn(
+            "bg-white rounded-2xl p-5 shadow-sm border border-slate-100",
+            isAllTimeView ? "lg:col-span-1" : "lg:col-span-1"
+          )}>
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">
+              {isAllTimeView ? "12-Month Trends" : "Monthly Trends"}
+            </h3>
             <div className="space-y-6">
               <MiniTrendChart
                 data={trends.map((t) => ({ month: t.month, value: t.strandHung }))}
@@ -311,8 +390,35 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Additional Trends - Only in All Time view */}
+          {isAllTimeView && (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+              <h3 className="text-sm font-semibold text-slate-900 mb-4">Infrastructure Trends</h3>
+              <div className="space-y-6">
+                <MiniTrendChart
+                  data={trends.map((t) => ({ month: t.month, value: t.drilled || 0 }))}
+                  label="Drilled"
+                  color="purple"
+                />
+                <MiniTrendChart
+                  data={trends.map((t) => ({ month: t.month, value: t.poles || 0 }))}
+                  label="Poles Attached"
+                  color="cyan"
+                />
+                <MiniTrendChart
+                  data={trends.map((t) => ({ month: t.month, value: t.logs }))}
+                  label="Work Logs"
+                  color="slate"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Metric Breakdowns */}
-          <div className="lg:col-span-3 grid md:grid-cols-3 gap-6">
+          <div className={cn(
+            "grid md:grid-cols-3 gap-6",
+            isAllTimeView ? "lg:col-span-2" : "lg:col-span-3"
+          )}>
             <AerialMetrics
               strandHung={m.strandHungFootage}
               fiberLashed={m.fiberLashedFootage}

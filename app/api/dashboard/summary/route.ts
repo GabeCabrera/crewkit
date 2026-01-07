@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const monthParam = searchParams.get("month"); // Format: "2025-01" or "current"
+    const monthParam = searchParams.get("month"); // Format: "2025-01", "current", or "all"
+    const isAllTime = monthParam === "all";
     
     // Calculate date ranges
     const now = new Date();
@@ -23,7 +24,13 @@ export async function GET(request: NextRequest) {
     let previousMonthStart: Date;
     let previousMonthEnd: Date;
 
-    if (monthParam && monthParam !== "current") {
+    if (isAllTime) {
+      // For all-time, we'll get all data and compare to overall averages
+      currentMonthStart = new Date(2000, 0, 1); // Far past date
+      currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      previousMonthStart = currentMonthStart;
+      previousMonthEnd = currentMonthEnd;
+    } else if (monthParam && monthParam !== "current") {
       const [year, month] = monthParam.split("-").map(Number);
       currentMonthStart = new Date(year, month - 1, 1);
       currentMonthEnd = new Date(year, month, 0, 23, 59, 59, 999);
@@ -220,9 +227,12 @@ export async function GET(request: NextRequest) {
       ? ((currentMonthCost - previousMonthCost) / previousMonthCost) * 100 
       : 0;
 
-    // Get monthly trends (last 6 months)
+    // Get monthly trends - show more months for all-time view
+    const trendMonths = isAllTime ? 12 : 6;
     const monthlyTrends = [];
-    for (let i = 5; i >= 0; i--) {
+    const allMonthlyData: AggregatedMetrics[] = [];
+    
+    for (let i = trendMonths - 1; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
       
@@ -236,14 +246,47 @@ export async function GET(request: NextRequest) {
       });
 
       const agg = aggregateFieldLogs(monthLogs);
+      allMonthlyData.push(agg);
       monthlyTrends.push({
         month: monthStart.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
         strandHung: agg.strandHungFootage,
         fiberLashed: agg.fiberLashedFootage,
         hoursWorked: agg.hoursWorked,
         logs: monthLogs.length,
+        // Include all metrics for all-time view
+        fiberPulled: agg.fiberPulledFootage,
+        drilled: agg.drilledFootage,
+        plowed: agg.plowedFootage,
+        poles: agg.polesAttached,
+        msts: agg.mstsInstalled,
+        risers: agg.risersInstalled,
+        spliceCases: agg.spliceCases,
+        handholes: agg.handholesPlaced,
+        vaults: agg.vaultsPlaced,
+        guys: agg.guysPlaced,
+        slackLoops: agg.slackLoops,
       });
     }
+
+    // Calculate monthly averages for all-time view
+    const monthsWithData = allMonthlyData.filter(m => m.totalLogs > 0).length;
+    const monthlyAverages = monthsWithData > 0 ? {
+      totalLogs: Math.round(allMonthlyData.reduce((sum, m) => sum + m.totalLogs, 0) / monthsWithData),
+      hoursWorked: Math.round(allMonthlyData.reduce((sum, m) => sum + m.hoursWorked, 0) / monthsWithData),
+      strandHungFootage: Math.round(allMonthlyData.reduce((sum, m) => sum + m.strandHungFootage, 0) / monthsWithData),
+      polesAttached: Math.round(allMonthlyData.reduce((sum, m) => sum + m.polesAttached, 0) / monthsWithData),
+      fiberLashedFootage: Math.round(allMonthlyData.reduce((sum, m) => sum + m.fiberLashedFootage, 0) / monthsWithData),
+      fiberPulledFootage: Math.round(allMonthlyData.reduce((sum, m) => sum + m.fiberPulledFootage, 0) / monthsWithData),
+      drilledFootage: Math.round(allMonthlyData.reduce((sum, m) => sum + m.drilledFootage, 0) / monthsWithData),
+      plowedFootage: Math.round(allMonthlyData.reduce((sum, m) => sum + m.plowedFootage, 0) / monthsWithData),
+      handholesPlaced: Math.round(allMonthlyData.reduce((sum, m) => sum + m.handholesPlaced, 0) / monthsWithData),
+      vaultsPlaced: Math.round(allMonthlyData.reduce((sum, m) => sum + m.vaultsPlaced, 0) / monthsWithData),
+      mstsInstalled: Math.round(allMonthlyData.reduce((sum, m) => sum + m.mstsInstalled, 0) / monthsWithData),
+      guysPlaced: Math.round(allMonthlyData.reduce((sum, m) => sum + m.guysPlaced, 0) / monthsWithData),
+      slackLoops: Math.round(allMonthlyData.reduce((sum, m) => sum + m.slackLoops, 0) / monthsWithData),
+      risersInstalled: Math.round(allMonthlyData.reduce((sum, m) => sum + m.risersInstalled, 0) / monthsWithData),
+      spliceCases: Math.round(allMonthlyData.reduce((sum, m) => sum + m.spliceCases, 0) / monthsWithData),
+    } : null;
 
     // System stats
     const [equipmentCount, assemblyCount, userCount, teamCount] = await Promise.all([
@@ -253,23 +296,34 @@ export async function GET(request: NextRequest) {
       prisma.team.count(),
     ]);
 
+    // Get first log date for all-time label
+    const firstLog = await prisma.fieldWorkLog.findFirst({
+      orderBy: { date: "asc" },
+      select: { date: true },
+    });
+    
+    const periodLabel = isAllTime 
+      ? `All Time${firstLog ? ` (Since ${firstLog.date.toLocaleDateString("en-US", { month: "short", year: "numeric" })})` : ""}`
+      : currentMonthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
     return NextResponse.json({
       period: {
         current: {
           start: currentMonthStart.toISOString(),
           end: currentMonthEnd.toISOString(),
-          label: currentMonthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+          label: periodLabel,
         },
         previous: {
           start: previousMonthStart.toISOString(),
           end: previousMonthEnd.toISOString(),
-          label: previousMonthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+          label: isAllTime ? "Monthly Average" : previousMonthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
         },
       },
       metrics: {
         current: currentMetrics,
         previous: previousMetrics,
         deltas,
+        averages: isAllTime ? monthlyAverages : null,
       },
       productivity: {
         uniqueWorkers: uniqueWorkers.size,
@@ -297,6 +351,8 @@ export async function GET(request: NextRequest) {
         users: userCount,
         teams: teamCount,
       },
+      isAllTime,
+      monthsWithData: isAllTime ? monthsWithData : null,
     }, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate",

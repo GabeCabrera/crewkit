@@ -110,13 +110,17 @@ export function MetricBreakdown({ title, icon, metrics, color = "blue" }: Metric
 interface TrendChartProps {
   data: Array<{ month: string; value: number }>;
   label: string;
-  color?: "orange" | "blue" | "emerald";
+  color?: "orange" | "blue" | "emerald" | "purple" | "cyan" | "slate" | "rose";
 }
 
 const trendColors = {
   orange: "bg-orange-500",
   blue: "bg-blue-500",
   emerald: "bg-emerald-500",
+  purple: "bg-purple-500",
+  cyan: "bg-cyan-500",
+  slate: "bg-slate-500",
+  rose: "bg-rose-500",
 };
 
 export function MiniTrendChart({ data, label, color = "blue" }: TrendChartProps) {
