@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { syncFromBoxHero, getSyncStats, SyncResult } from "@/lib/boxhero-sync";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/boxhero/sync
  * Trigger a sync from BoxHero to local database

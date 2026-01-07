@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getNormalizedBoxHeroItems, getBoxHeroLocations } from "@/lib/boxhero";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/boxhero/items
  * Fetch items from BoxHero inventory (read-only)

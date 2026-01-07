@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { createAssemblyUsageSchema, validateRequest } from "@/lib/validations";
 import { writeRateLimit } from "@/lib/rate-limit";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   // Rate limit write operations
   const rateLimitResult = writeRateLimit(request);

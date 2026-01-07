@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { createTeamSchema, validateRequest } from "@/lib/validations";
 import { writeRateLimit } from "@/lib/rate-limit";
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/teams - List teams
 export async function GET() {
   try {

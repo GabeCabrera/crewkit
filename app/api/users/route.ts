@@ -6,6 +6,8 @@ import { createUserSchema, validateRequest } from "@/lib/validations";
 import { writeRateLimit } from "@/lib/rate-limit";
 import bcrypt from "bcryptjs";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

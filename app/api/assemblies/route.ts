@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { createAssemblySchema, validateRequest } from "@/lib/validations";
 import { writeRateLimit } from "@/lib/rate-limit";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);

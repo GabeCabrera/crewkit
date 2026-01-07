@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getBoxHeroLocations } from "@/lib/boxhero";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/boxhero/locations
  * Fetch locations from BoxHero (read-only)

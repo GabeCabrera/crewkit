@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/reports/field-logs - Get field work logs with filters and aggregations
 export async function GET(request: NextRequest) {
   try {
