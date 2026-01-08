@@ -225,6 +225,46 @@ export async function DELETE(
       );
     }
 
+    // Delete related records first to avoid foreign key constraints
+    // Delete assembly usage logs
+    await prisma.assemblyUsageLog.deleteMany({
+      where: { userId: params.id },
+    });
+
+    // Delete equipment logs
+    await prisma.equipmentLog.deleteMany({
+      where: { userId: params.id },
+    });
+
+    // Delete assemblies created by this user (and their items will cascade)
+    await prisma.assembly.deleteMany({
+      where: { createdById: params.id },
+    });
+
+    // Reassign teams created by this user to the current admin, or delete if no members
+    const teamsCreated = await prisma.team.findMany({
+      where: { creatorId: params.id },
+      include: { _count: { select: { members: true } } },
+    });
+
+    for (const team of teamsCreated) {
+      if (team._count.members === 0) {
+        await prisma.team.delete({ where: { id: team.id } });
+      } else {
+        // Reassign to current user
+        await prisma.team.update({
+          where: { id: team.id },
+          data: { creatorId: session.user.id },
+        });
+      }
+    }
+
+    // Delete EOD reports created by this user
+    await prisma.endOfDayReport.deleteMany({
+      where: { createdById: params.id },
+    });
+
+    // Now delete the user
     await prisma.user.delete({
       where: { id: params.id },
     });
