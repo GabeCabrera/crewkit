@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from "lucide-react";
+import { Settings, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
 
 export default function AdminSettingsPage() {
+  const { data: session } = useSession();
+  const isSuperuser = session?.user?.role === "SUPERUSER";
+
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -14,6 +18,58 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Company name settings (SUPERUSER only)
+  const [companyName, setCompanyName] = useState("");
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [companySuccess, setCompanySuccess] = useState<string | null>(null);
+  const [companyError, setCompanyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isSuperuser) {
+      fetch("/api/settings")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.companyName) {
+            setCompanyName(data.companyName);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [isSuperuser]);
+
+  const handleSaveCompanyName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCompanySuccess(null);
+    setCompanyError(null);
+
+    if (!companyName.trim()) {
+      setCompanyError("Company name is required");
+      return;
+    }
+
+    setCompanyLoading(true);
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyName: companyName.trim() }),
+      });
+
+      if (response.ok) {
+        setCompanySuccess("Company name updated successfully");
+        // Trigger a page refresh to update navbar
+        window.location.reload();
+      } else {
+        const data = await response.json();
+        setCompanyError(data.error || "Failed to update company name");
+      }
+    } catch (err) {
+      setCompanyError("An error occurred");
+    } finally {
+      setCompanyLoading(false);
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +214,62 @@ export default function AdminSettingsPage() {
             </div>
           </form>
         </div>
+
+        {/* Company Name Settings (SUPERUSER only) */}
+        {isSuperuser && (
+          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Company Name</h2>
+                <p className="text-sm text-slate-500">Configure the company name displayed in the app</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveCompanyName} className="space-y-5">
+              {companySuccess && (
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-3 rounded-xl text-sm">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {companySuccess}
+                </div>
+              )}
+              
+              {companyError && (
+                <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  {companyError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Enter company name"
+                  className="h-12 rounded-xl"
+                  maxLength={50}
+                  required
+                />
+                <p className="text-xs text-slate-400">This name appears in the navigation bar</p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  type="submit" 
+                  disabled={companyLoading}
+                  className="bg-orange-500 hover:bg-orange-600 rounded-xl h-12 px-6"
+                >
+                  {companyLoading ? "Saving..." : "Save Company Name"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Additional Settings Placeholder */}
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">

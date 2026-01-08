@@ -168,6 +168,14 @@ model EndOfDayReport {
   @@unique([date, teamId])  // One report per team per day
 }
 
+// System settings (singleton pattern - only one row)
+model SystemSettings {
+  id              String   @id @default("settings")
+  companyName     String   @default("CrewKit")
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+}
+
 // Detailed field work log for construction activities
 model FieldWorkLog {
   id              String   @id @default(cuid())

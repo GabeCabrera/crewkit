@@ -3,7 +3,7 @@
 import { signOut, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { LogOut, Menu } from "lucide-react";
+import { LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sidebar } from "./sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react";
 
 function NavbarSkeleton() {
   return (
@@ -32,6 +33,18 @@ function NavbarSkeleton() {
 export function Navbar() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [companyName, setCompanyName] = useState("CrewKit");
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.companyName) {
+          setCompanyName(data.companyName);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const handleSignOut = async () => {
     await signOut({ redirect: false });
@@ -64,7 +77,7 @@ export function Navbar() {
         <div className="flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
           {/* Left section */}
           <div className="flex items-center gap-3">
-            <h1 className="text-lg md:text-xl font-bold">CrewKit</h1>
+            <h1 className="text-lg md:text-xl font-bold">{companyName}</h1>
             <span className="hidden md:inline-block text-sm text-muted-foreground capitalize px-2 py-0.5 bg-muted rounded-md">
               {session?.user?.role?.toLowerCase()}
             </span>
