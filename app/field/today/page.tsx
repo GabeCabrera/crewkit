@@ -215,8 +215,8 @@ export default function FieldTodayPage() {
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="bg-card rounded-2xl p-4 sm:p-5 border">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                  <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                  <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
                 </div>
                 <div>
                   <p className="text-xs sm:text-sm text-muted-foreground">Assemblies</p>
@@ -291,8 +291,8 @@ export default function FieldTodayPage() {
                       className="w-full p-4 sm:p-5 text-left hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-                          <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                        <div className="h-10 w-10 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
+                          <Layers className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">

@@ -16,28 +16,28 @@ interface MetricCardProps {
 
 const variants = {
   default: "bg-white border border-slate-100",
-  primary: "bg-gradient-to-br from-blue-600 to-blue-700 text-white",
+  primary: "bg-gradient-to-br from-orange-500 to-orange-600 text-white",
   success: "bg-gradient-to-br from-emerald-600 to-emerald-700 text-white",
-  warning: "bg-gradient-to-br from-amber-500 to-amber-600 text-white",
-  info: "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white",
+  warning: "bg-gradient-to-br from-orange-400 to-orange-500 text-white",
+  info: "bg-gradient-to-br from-blue-500 to-blue-600 text-white",
   dark: "bg-gradient-to-br from-slate-900 to-slate-800 text-white",
 };
 
 const textColors = {
   default: { title: "text-slate-500", value: "text-slate-900", subtitle: "text-slate-500" },
-  primary: { title: "text-blue-100", value: "text-white", subtitle: "text-blue-200" },
+  primary: { title: "text-orange-100", value: "text-white", subtitle: "text-orange-200" },
   success: { title: "text-emerald-100", value: "text-white", subtitle: "text-emerald-200" },
-  warning: { title: "text-amber-100", value: "text-white", subtitle: "text-amber-200" },
-  info: { title: "text-cyan-100", value: "text-white", subtitle: "text-cyan-200" },
+  warning: { title: "text-orange-100", value: "text-white", subtitle: "text-orange-200" },
+  info: { title: "text-blue-100", value: "text-white", subtitle: "text-blue-200" },
   dark: { title: "text-slate-300", value: "text-white", subtitle: "text-slate-400" },
 };
 
 const iconColors = {
   default: "text-slate-400",
-  primary: "text-blue-300",
+  primary: "text-orange-200",
   success: "text-emerald-300",
-  warning: "text-amber-200",
-  info: "text-cyan-200",
+  warning: "text-orange-200",
+  info: "text-blue-200",
   dark: "text-slate-500",
 };
 

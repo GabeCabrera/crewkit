@@ -53,9 +53,9 @@ export default function FieldDashboard() {
   };
 
   const quickActions = [
-    { href: "/field/assemblies", icon: Layers, label: "Select Assembly", description: "Log equipment usage", color: "from-blue-500 to-blue-600" },
+    { href: "/field/assemblies", icon: Layers, label: "Select Assembly", description: "Log equipment usage", color: "from-orange-500 to-orange-600" },
     { href: "/field/today", icon: Clock, label: "Today's Usage", description: "View your summary", color: "from-emerald-500 to-emerald-600" },
-    { href: "/field/inventory", icon: Package, label: "Inventory", description: "Check stock levels", color: "from-purple-500 to-purple-600" },
+    { href: "/field/inventory", icon: Package, label: "Inventory", description: "Check stock levels", color: "from-slate-600 to-slate-700" },
   ];
 
   return (
@@ -152,8 +152,8 @@ export default function FieldDashboard() {
                         className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                            <Layers className="h-4 w-4 text-blue-600" />
+                          <div className="h-8 w-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                            <Layers className="h-4 w-4 text-orange-600" />
                           </div>
                           <div>
                             <p className="font-medium text-sm text-slate-900">{log.assembly.name}</p>

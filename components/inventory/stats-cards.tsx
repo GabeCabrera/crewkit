@@ -80,8 +80,8 @@ export function StatsCards({ stats, hideValue = false }: StatsCardsProps) {
       shortLabel: "Equipment",
       value: stats.totalEquipment,
       icon: Package,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
       priority: 1, // Always visible
     },
     {
@@ -89,8 +89,8 @@ export function StatsCards({ stats, hideValue = false }: StatsCardsProps) {
       shortLabel: "Assemblies",
       value: stats.totalAssemblies,
       icon: Layers,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
+      color: "text-slate-600",
+      bgColor: "bg-slate-50",
       priority: 1,
     },
     {

@@ -54,7 +54,7 @@ export function RecentLogsTable({ logs, maxItems = 5 }: RecentLogsTableProps) {
           </CardTitle>
           <Link
             href="/admin/reports?tab=logs"
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+            className="text-xs text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1"
           >
             View All <ArrowRight className="h-3 w-3" />
           </Link>
@@ -94,7 +94,7 @@ export function RecentLogsTable({ logs, maxItems = 5 }: RecentLogsTableProps) {
                         <p className="font-mono text-orange-600">{formatNumber(log.strandHungFootage)} ft strand</p>
                       ) : null}
                       {(log.fiberLashedFootage || log.fiberPulledFootage) ? (
-                        <p className="font-mono text-blue-600">
+                        <p className="font-mono text-orange-600">
                           {formatNumber((log.fiberLashedFootage || 0) + (log.fiberPulledFootage || 0))} ft fiber
                         </p>
                       ) : null}
@@ -140,7 +140,7 @@ export function TodayUsageList({ usage, todayCost }: TodayUsageListProps) {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
-            <Layers className="h-4 w-4 text-purple-500" />
+            <Layers className="h-4 w-4 text-orange-500" />
             Today&apos;s Usage
           </CardTitle>
           <Badge variant="secondary" className="font-mono">
@@ -239,7 +239,7 @@ export function ProductivitySection({ contributors, locations, uniqueWorkers }: 
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-blue-500" />
+            <MapPin className="h-4 w-4 text-orange-500" />
             Top Job Sites
           </CardTitle>
         </CardHeader>
@@ -247,7 +247,7 @@ export function ProductivitySection({ contributors, locations, uniqueWorkers }: 
           <div className="space-y-2">
             {locations.map((loc, i) => (
               <div key={loc.name} className="flex items-center gap-3">
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
+                <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">
                   {i + 1}
                 </span>
                 <span className="flex-1 truncate text-sm font-medium">{loc.name}</span>

@@ -220,25 +220,25 @@ function TodayOverviewTab() {
     <>
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-500 to-orange-600 text-white">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-100">Assemblies Used</p>
+                <p className="text-sm text-orange-100">Assemblies Used</p>
                 <p className="text-3xl font-bold">{summary?.totalAssemblies || 0}</p>
               </div>
-              <Layers className="h-10 w-10 text-blue-300" />
+              <Layers className="h-10 w-10 text-orange-200" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-600 to-purple-700 text-white">
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-600 to-slate-700 text-white">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-purple-100">Items Consumed</p>
+                <p className="text-sm text-slate-200">Items Consumed</p>
                 <p className="text-3xl font-bold">{summary?.totalItems || 0}</p>
               </div>
-              <Package className="h-10 w-10 text-purple-300" />
+              <Package className="h-10 w-10 text-slate-300" />
             </div>
           </CardContent>
         </Card>
@@ -271,7 +271,7 @@ function TodayOverviewTab() {
         <Card className="border-0 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Layers className="h-4 w-4 text-blue-500" />
+              <Layers className="h-4 w-4 text-orange-500" />
               Today&apos;s Assembly Usage
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={fetchData}>
@@ -360,7 +360,7 @@ function TodayOverviewTab() {
                           <p className="font-mono text-orange-600">{formatNumber(log.strandHungFootage)} ft strand</p>
                         ) : null}
                         {(log.fiberLashedFootage || log.fiberPulledFootage) ? (
-                          <p className="font-mono text-blue-600">
+                          <p className="font-mono text-orange-600">
                             {formatNumber((log.fiberLashedFootage || 0) + (log.fiberPulledFootage || 0))} ft fiber
                           </p>
                         ) : null}
@@ -445,8 +445,8 @@ function FieldLogsTab() {
           <Card className="border-0 shadow-sm">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Clock className="h-5 w-5 text-blue-600" />
+                <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-orange-600" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Hours Worked</p>
@@ -600,9 +600,9 @@ function FieldLogsTab() {
                     </div>
                   )}
                   {selectedLog.fiberLashedFootage && selectedLog.fiberLashedFootage > 0 && (
-                    <div className="bg-blue-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-blue-700">{formatNumber(selectedLog.fiberLashedFootage)} ft</p>
-                      <p className="text-xs text-blue-600">Fiber Lashed</p>
+                    <div className="bg-orange-50 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-orange-700">{formatNumber(selectedLog.fiberLashedFootage)} ft</p>
+                      <p className="text-xs text-orange-600">Fiber Lashed</p>
                     </div>
                   )}
                   {selectedLog.fiberPulledFootage && selectedLog.fiberPulledFootage > 0 && (
@@ -612,9 +612,9 @@ function FieldLogsTab() {
                     </div>
                   )}
                   {selectedLog.polesAttached && selectedLog.polesAttached > 0 && (
-                    <div className="bg-purple-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-purple-700">{selectedLog.polesAttached}</p>
-                      <p className="text-xs text-purple-600">Poles Attached</p>
+                    <div className="bg-slate-50 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-slate-700">{selectedLog.polesAttached}</p>
+                      <p className="text-xs text-slate-600">Poles Attached</p>
                     </div>
                   )}
                   {selectedLog.mstsInstalled && selectedLog.mstsInstalled > 0 && (
@@ -904,7 +904,7 @@ function SubmitLogTab() {
   return (
     <Card className="border-0 shadow-sm max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-500" />Submit Daily Work Log</CardTitle>
+        <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-orange-500" />Submit Daily Work Log</CardTitle>
         <CardDescription>Record today&apos;s construction progress and crew activity</CardDescription>
       </CardHeader>
       <CardContent>

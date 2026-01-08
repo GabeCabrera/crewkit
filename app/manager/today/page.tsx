@@ -179,8 +179,8 @@ export default function ManagerTodayPage() {
                   <p className="text-sm font-medium text-muted-foreground">Logs Today</p>
                   <p className="text-3xl font-bold">{summary.logCount}</p>
                 </div>
-                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-blue-600" />
+                <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-orange-600" />
                 </div>
               </div>
             </CardContent>

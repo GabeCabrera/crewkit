@@ -47,8 +47,8 @@ export default function ManagerDashboard() {
   }, []);
 
   const quickActions = [
-    { href: "/manager/today", icon: Clock, label: "Today&apos;s Activity", description: "View team usage", color: "from-blue-500 to-blue-600" },
-    { href: "/manager/teams", icon: Users2, label: "My Team", description: "View team members", color: "from-purple-500 to-purple-600" },
+    { href: "/manager/today", icon: Clock, label: "Today&apos;s Activity", description: "View team usage", color: "from-orange-500 to-orange-600" },
+    { href: "/manager/teams", icon: Users2, label: "My Team", description: "View team members", color: "from-slate-600 to-slate-700" },
     { href: "/manager/end-of-day", icon: FileText, label: "End of Day", description: "Create EOD report", color: "from-emerald-500 to-emerald-600" },
     { href: "/manager/reports", icon: FileText, label: "Reports", description: "View past reports", color: "from-amber-500 to-amber-600" },
     { href: "/manager/assemblies", icon: Layers, label: "Assemblies", description: "Manage assemblies", color: "from-cyan-500 to-cyan-600" },
@@ -82,8 +82,8 @@ export default function ManagerDashboard() {
         ) : teamSummary ? (
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-purple-50 flex items-center justify-center">
-                <Users2 className="h-6 w-6 text-purple-600" />
+              <div className="h-12 w-12 rounded-xl bg-orange-50 flex items-center justify-center">
+                <Users2 className="h-6 w-6 text-orange-600" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">{teamSummary.name}</h2>

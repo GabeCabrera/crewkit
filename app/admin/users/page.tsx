@@ -218,8 +218,8 @@ export default function UsersPage() {
 
   const getRoleStyle = (role: string) => {
     switch (role) {
-      case "ADMIN": return "bg-purple-50 text-purple-700 border-purple-200";
-      case "MANAGER": return "bg-blue-50 text-blue-700 border-blue-200";
+      case "ADMIN": return "bg-orange-50 text-orange-700 border-orange-200";
+      case "MANAGER": return "bg-slate-50 text-slate-700 border-slate-200";
       case "FIELD": return "bg-emerald-50 text-emerald-700 border-emerald-200";
       default: return "";
     }

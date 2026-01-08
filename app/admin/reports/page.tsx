@@ -204,8 +204,8 @@ function TodayActivityTab() {
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Layers className="h-5 w-5 text-blue-600" />
+              <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                <Layers className="h-5 w-5 text-orange-600" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Assemblies Used</p>
@@ -217,8 +217,8 @@ function TodayActivityTab() {
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <Package className="h-5 w-5 text-purple-600" />
+              <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Package className="h-5 w-5 text-slate-600" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Items Consumed</p>
@@ -486,14 +486,14 @@ function DailyLogsTab() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+          <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-500 to-orange-600 text-white">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-100">Hours Worked</p>
+                  <p className="text-sm text-orange-100">Hours Worked</p>
                   <p className="text-3xl font-bold">{formatNumber(Math.round(summary.totalHoursWorked))}</p>
                 </div>
-                <Clock className="h-10 w-10 text-blue-300" />
+                <Clock className="h-10 w-10 text-orange-200" />
               </div>
             </CardContent>
           </Card>
@@ -562,9 +562,9 @@ function DailyLogsTab() {
                   {diagnoseData ? (
                     <div className="space-y-4 py-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-blue-50 rounded-lg p-4">
-                          <p className="text-2xl font-bold text-blue-700">{diagnoseData.totalCount}</p>
-                          <p className="text-sm text-blue-600">Total Logs</p>
+                        <div className="bg-orange-50 rounded-lg p-4">
+                          <p className="text-2xl font-bold text-orange-700">{diagnoseData.totalCount}</p>
+                          <p className="text-sm text-orange-600">Total Logs</p>
                         </div>
                         <div className="bg-amber-50 rounded-lg p-4">
                           <p className="text-2xl font-bold text-amber-700">{diagnoseData.duplicates.count}</p>
@@ -731,9 +731,9 @@ function DailyLogsTab() {
                     </div>
                   )}
                   {selectedLog.fiberLashedFootage && selectedLog.fiberLashedFootage > 0 && (
-                    <div className="bg-blue-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-blue-700">{formatNumber(selectedLog.fiberLashedFootage)} ft</p>
-                      <p className="text-xs text-blue-600">Fiber Lashed</p>
+                    <div className="bg-orange-50 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-orange-700">{formatNumber(selectedLog.fiberLashedFootage)} ft</p>
+                      <p className="text-xs text-orange-600">Fiber Lashed</p>
                     </div>
                   )}
                   {selectedLog.fiberPulledFootage && selectedLog.fiberPulledFootage > 0 && (
@@ -743,9 +743,9 @@ function DailyLogsTab() {
                     </div>
                   )}
                   {selectedLog.polesAttached && selectedLog.polesAttached > 0 && (
-                    <div className="bg-purple-50 rounded-lg p-3 text-center">
-                      <p className="text-lg font-bold text-purple-700">{selectedLog.polesAttached}</p>
-                      <p className="text-xs text-purple-600">Poles Attached</p>
+                    <div className="bg-slate-50 rounded-lg p-3 text-center">
+                      <p className="text-lg font-bold text-slate-700">{selectedLog.polesAttached}</p>
+                      <p className="text-xs text-slate-600">Poles Attached</p>
                     </div>
                   )}
                   {selectedLog.mstsInstalled && selectedLog.mstsInstalled > 0 && (
@@ -903,7 +903,7 @@ function SubmitReportTab() {
   return (
     <Card className="border-0 shadow-sm max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-500" />Submit Daily Work Log</CardTitle>
+        <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-orange-500" />Submit Daily Work Log</CardTitle>
         <CardDescription>Record today&apos;s construction progress and crew activity</CardDescription>
       </CardHeader>
       <CardContent>

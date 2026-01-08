@@ -131,7 +131,7 @@ function AverageCard({ label, value }: { label: string; value: string | number }
     <div className="bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-white/50">
       <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">{label}</p>
       <p className="text-lg font-bold text-slate-900">{value}</p>
-      <p className="text-xs text-violet-600 mt-1">per month</p>
+      <p className="text-xs text-orange-600 mt-1">per month</p>
     </div>
   );
 }
@@ -189,10 +189,10 @@ export default function AdminDashboard() {
   const isAllTimeView = selectedMonth === "all";
 
   const quickActions = [
-    { href: "/admin/inventory", icon: Package, label: "Inventory", description: "Equipment & assemblies", color: "from-blue-500 to-blue-600" },
-    { href: "/admin/team-management", icon: Users2, label: "Team Management", description: "Teams & users", color: "from-purple-500 to-purple-600" },
-    { href: "/admin/reports", icon: FileText, label: "Reports", description: "All reports & logs", color: "from-amber-500 to-amber-600" },
-    { href: "/admin/settings", icon: Settings, label: "Settings", description: "System configuration", color: "from-slate-500 to-slate-600" },
+    { href: "/admin/inventory", icon: Package, label: "Inventory", description: "Equipment & assemblies", color: "from-orange-500 to-orange-600" },
+    { href: "/admin/team-management", icon: Users2, label: "Team Management", description: "Teams & users", color: "from-slate-600 to-slate-700" },
+    { href: "/admin/reports", icon: FileText, label: "Reports", description: "All reports & logs", color: "from-emerald-500 to-emerald-600" },
+    { href: "/admin/settings", icon: Settings, label: "Settings", description: "System configuration", color: "from-slate-600 to-slate-700" },
   ];
 
   const formatNumber = (num: number) => new Intl.NumberFormat("en-US").format(Math.round(num));
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-3">
               <div className={cn(
                 "h-10 w-10 rounded-xl bg-gradient-to-br flex items-center justify-center",
-                isAllTimeView ? "from-violet-600 to-indigo-700" : "from-slate-900 to-slate-700"
+                isAllTimeView ? "from-orange-500 to-orange-600" : "from-orange-500 to-orange-600"
               )}>
                 {isAllTimeView ? <BarChart3 className="h-5 w-5 text-white" /> : <Activity className="h-5 w-5 text-white" />}
               </div>
@@ -340,9 +340,9 @@ export default function AdminDashboard() {
 
         {/* Monthly Averages Section - Only shown in All Time view */}
         {isAllTimeView && metrics.averages && (
-          <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-6 border border-violet-100">
+          <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 border border-orange-100">
             <div className="flex items-center gap-3 mb-5">
-              <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
                 <Gauge className="h-4 w-4 text-white" />
               </div>
               <div>

@@ -206,8 +206,8 @@ export function GlobalSearch({
                         onClick={() => handleSelect(result)}
                         onMouseEnter={() => setSelectedIndex(globalIndex)}
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100">
-                          <Package className="h-4 w-4 text-blue-600" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-orange-100">
+                          <Package className="h-4 w-4 text-orange-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{eq.name}</p>
@@ -247,8 +247,8 @@ export function GlobalSearch({
                         onClick={() => handleSelect(result)}
                         onMouseEnter={() => setSelectedIndex(globalIndex)}
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-purple-100">
-                          <Layers className="h-4 w-4 text-purple-600" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100">
+                          <Layers className="h-4 w-4 text-slate-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{asm.name}</p>

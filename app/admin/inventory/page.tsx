@@ -348,7 +348,7 @@ export default function InventoryPage() {
         <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-6xl mx-auto">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
                 <Package className="h-5 w-5 text-white" />
               </div>
               <div>

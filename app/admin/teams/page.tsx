@@ -225,7 +225,7 @@ export default function AdminTeamsPage() {
         <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-6xl mx-auto">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
                 <Users2 className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -371,7 +371,7 @@ export default function AdminTeamsPage() {
                         variant="secondary"
                         className={cn(
                           "text-xs bg-slate-100 text-slate-600",
-                          member.role === "MANAGER" && "bg-blue-50 text-blue-700"
+                          member.role === "MANAGER" && "bg-orange-50 text-orange-700"
                         )}
                       >
                         {member.name || member.email.split("@")[0]}
@@ -456,7 +456,7 @@ export default function AdminTeamsPage() {
                       key={user.id}
                       className={cn(
                         "flex items-center justify-between p-3 cursor-pointer hover:bg-slate-50 transition-colors",
-                        selectedMembers.includes(user.id) && "bg-blue-50"
+                        selectedMembers.includes(user.id) && "bg-orange-50"
                       )}
                       onClick={() => toggleMember(user.id)}
                     >

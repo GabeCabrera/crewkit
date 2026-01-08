@@ -135,10 +135,10 @@ export default function ManagerTeamsPage() {
                 {managers.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border bg-blue-50/50 border-blue-100"
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-orange-50/50 border-orange-100"
                   >
-                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <span className="text-sm font-medium text-blue-700">
+                    <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center">
+                      <span className="text-sm font-medium text-orange-700">
                         {member.name?.[0]?.toUpperCase() || member.email[0].toUpperCase()}
                       </span>
                     </div>
@@ -151,7 +151,7 @@ export default function ManagerTeamsPage() {
                         {member.email}
                       </p>
                     </div>
-                    <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                    <Badge className="bg-orange-100 text-orange-800 border-orange-200">
                       Manager
                     </Badge>
                   </div>

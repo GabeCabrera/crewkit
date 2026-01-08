@@ -197,13 +197,13 @@ export function EquipmentTable({
   return (
     <div className="space-y-4">
       {/* Sync Status Banner - Collapsible on mobile */}
-      <Card className="border-blue-200 bg-blue-50/50">
+      <Card className="border-orange-200 bg-orange-50/50">
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             {/* Left side */}
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg shrink-0">
-                <Cloud className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+              <div className="p-2 bg-orange-100 rounded-lg shrink-0">
+                <Cloud className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
               </div>
               <div className="min-w-0">
                 <p className="font-medium text-sm">BoxHero Sync</p>

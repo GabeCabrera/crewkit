@@ -25,7 +25,7 @@ export function ProgressBar({
   label,
   value,
   max = 100,
-  color = "blue",
+  color = "orange",
   showValue = true,
   unit = "",
 }: ProgressBarProps) {
@@ -78,7 +78,7 @@ const sectionColors = {
   },
 };
 
-export function MetricBreakdown({ title, icon, metrics, color = "blue" }: MetricBreakdownProps) {
+export function MetricBreakdown({ title, icon, metrics, color = "orange" }: MetricBreakdownProps) {
   const colors = sectionColors[color];
 
   return (
@@ -123,7 +123,7 @@ const trendColors = {
   rose: "bg-rose-500",
 };
 
-export function MiniTrendChart({ data, label, color = "blue" }: TrendChartProps) {
+export function MiniTrendChart({ data, label, color = "orange" }: TrendChartProps) {
   const maxValue = Math.max(...data.map((d) => d.value), 1);
 
   return (

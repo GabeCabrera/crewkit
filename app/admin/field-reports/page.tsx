@@ -338,14 +338,14 @@ export default function AdminFieldReportsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-500 to-orange-600 text-white">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-blue-100">Hours Worked</p>
+                    <p className="text-sm text-orange-100">Hours Worked</p>
                     <p className="text-3xl font-bold">{formatNumber(Math.round(summary.totalHoursWorked))}</p>
                   </div>
-                  <Clock className="h-10 w-10 text-blue-300" />
+                  <Clock className="h-10 w-10 text-orange-200" />
                 </div>
               </CardContent>
             </Card>
@@ -360,14 +360,14 @@ export default function AdminFieldReportsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-600 to-purple-700 text-white">
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-600 to-slate-700 text-white">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-100">Locations</p>
+                    <p className="text-sm text-slate-100">Locations</p>
                     <p className="text-3xl font-bold">{formatNumber(locations.length)}</p>
                   </div>
-                  <MapPin className="h-10 w-10 text-purple-300" />
+                  <MapPin className="h-10 w-10 text-slate-300" />
                 </div>
               </CardContent>
             </Card>
@@ -668,15 +668,15 @@ export default function AdminFieldReportsPage() {
                       </div>
                     )}
                     {selectedLog.fiberLashedFootage && (
-                      <div className="bg-blue-50 rounded-lg p-3 text-center">
-                        <p className="text-lg font-bold text-blue-700">{formatNumber(selectedLog.fiberLashedFootage)} ft</p>
-                        <p className="text-xs text-blue-600">Fiber Lashed</p>
+                      <div className="bg-orange-50 rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-orange-700">{formatNumber(selectedLog.fiberLashedFootage)} ft</p>
+                        <p className="text-xs text-orange-600">Fiber Lashed</p>
                       </div>
                     )}
                     {selectedLog.fiberPulledFootage && (
-                      <div className="bg-blue-50 rounded-lg p-3 text-center">
-                        <p className="text-lg font-bold text-blue-700">{formatNumber(selectedLog.fiberPulledFootage)} ft</p>
-                        <p className="text-xs text-blue-600">Fiber Pulled</p>
+                      <div className="bg-orange-50 rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-orange-700">{formatNumber(selectedLog.fiberPulledFootage)} ft</p>
+                        <p className="text-xs text-orange-600">Fiber Pulled</p>
                       </div>
                     )}
                     {selectedLog.drilledFootage && (
@@ -704,15 +704,15 @@ export default function AdminFieldReportsPage() {
                       </div>
                     )}
                     {selectedLog.mstsInstalled && (
-                      <div className="bg-purple-50 rounded-lg p-3 text-center">
-                        <p className="text-lg font-bold text-purple-700">{selectedLog.mstsInstalled}</p>
-                        <p className="text-xs text-purple-600">MSTs</p>
+                      <div className="bg-slate-50 rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-slate-700">{selectedLog.mstsInstalled}</p>
+                        <p className="text-xs text-slate-600">MSTs</p>
                       </div>
                     )}
                     {selectedLog.risersInstalled && (
-                      <div className="bg-purple-50 rounded-lg p-3 text-center">
-                        <p className="text-lg font-bold text-purple-700">{selectedLog.risersInstalled}</p>
-                        <p className="text-xs text-purple-600">Risers</p>
+                      <div className="bg-slate-50 rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-slate-700">{selectedLog.risersInstalled}</p>
+                        <p className="text-xs text-slate-600">Risers</p>
                       </div>
                     )}
                     {selectedLog.spliceCases && (

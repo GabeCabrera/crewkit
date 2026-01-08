@@ -250,8 +250,8 @@ function TeamsTab() {
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <Users2 className="h-5 w-5 text-purple-600" />
+              <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                <Users2 className="h-5 w-5 text-orange-600" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Teams</p>
@@ -263,8 +263,8 @@ function TeamsTab() {
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Users className="h-5 w-5 text-blue-600" />
+              <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Users className="h-5 w-5 text-slate-600" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Members</p>
@@ -549,7 +549,7 @@ function UsersTab() {
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center"><Users className="h-5 w-5 text-blue-600" /></div>
+              <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center"><Users className="h-5 w-5 text-orange-600" /></div>
               <div><p className="text-sm text-muted-foreground">Total Users</p><p className="text-2xl font-bold">{users.length}</p></div>
             </div>
           </CardContent>
@@ -670,7 +670,7 @@ function UsersTab() {
                   <tr key={user.id} className="border-b last:border-0 hover:bg-muted/50">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-white font-medium">
                           {(user.name || user.email)[0].toUpperCase()}
                         </div>
                         <div>
