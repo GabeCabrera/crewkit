@@ -517,14 +517,16 @@ function UsersTab() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
+      case "SUPERUSER": return <Shield className="h-4 w-4" />;
       case "ADMIN": return <Shield className="h-4 w-4" />;
       case "MANAGER": return <Briefcase className="h-4 w-4" />;
       default: return <HardHat className="h-4 w-4" />;
     }
   };
 
-  const getRoleBadgeVariant = (role: string): "default" | "secondary" | "outline" => {
+  const getRoleBadgeVariant = (role: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (role) {
+      case "SUPERUSER": return "destructive";
       case "ADMIN": return "default";
       case "MANAGER": return "secondary";
       default: return "outline";
@@ -588,6 +590,7 @@ function UsersTab() {
           <SelectTrigger className="w-[140px]"><SelectValue placeholder="Role" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="SUPERUSER">Superuser</SelectItem>
             <SelectItem value="ADMIN">Admin</SelectItem>
             <SelectItem value="MANAGER">Manager</SelectItem>
             <SelectItem value="FIELD">Field</SelectItem>
@@ -622,6 +625,7 @@ function UsersTab() {
                   <Select value={formData.role} onValueChange={(v) => setFormData(prev => ({ ...prev, role: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="SUPERUSER">Superuser</SelectItem>
                       <SelectItem value="ADMIN">Admin</SelectItem>
                       <SelectItem value="MANAGER">Manager</SelectItem>
                       <SelectItem value="FIELD">Field</SelectItem>
@@ -630,10 +634,10 @@ function UsersTab() {
                 </div>
                 <div className="space-y-2">
                   <Label>Team</Label>
-                  <Select value={formData.teamId} onValueChange={(v) => setFormData(prev => ({ ...prev, teamId: v }))}>
+                  <Select value={formData.teamId || "__none__"} onValueChange={(v) => setFormData(prev => ({ ...prev, teamId: v === "__none__" ? "" : v }))}>
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__none__">None</SelectItem>
                       {teams.map(team => <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -712,6 +716,7 @@ function UsersTab() {
                 <Select value={editFormData.role} onValueChange={(v) => setEditFormData(prev => ({ ...prev, role: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="SUPERUSER">Superuser</SelectItem>
                     <SelectItem value="ADMIN">Admin</SelectItem>
                     <SelectItem value="MANAGER">Manager</SelectItem>
                     <SelectItem value="FIELD">Field</SelectItem>
@@ -720,10 +725,10 @@ function UsersTab() {
               </div>
               <div className="space-y-2">
                 <Label>Team</Label>
-                <Select value={editFormData.teamId} onValueChange={(v) => setEditFormData(prev => ({ ...prev, teamId: v }))}>
+                <Select value={editFormData.teamId || "__none__"} onValueChange={(v) => setEditFormData(prev => ({ ...prev, teamId: v === "__none__" ? "" : v }))}>
                   <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
                     {teams.map(team => <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
