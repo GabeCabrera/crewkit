@@ -77,7 +77,7 @@ export function Navbar() {
         <div className="flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
           {/* Left section */}
           <div className="flex items-center gap-3">
-            <h1 className="text-lg md:text-xl font-bold">{companyName}</h1>
+            <h1 className="text-lg md:text-xl font-bold text-orange-500">{companyName}</h1>
             <span className="hidden md:inline-block text-sm text-muted-foreground capitalize px-2 py-0.5 bg-muted rounded-md">
               {session?.user?.role?.toLowerCase()}
             </span>

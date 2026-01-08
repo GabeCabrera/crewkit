@@ -118,6 +118,18 @@ export function Sidebar() {
   const { data: session, status } = useSession();
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const role = session?.user?.role || "ADMIN";
+  const [companyName, setCompanyName] = useState("CrewKit");
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.companyName) {
+          setCompanyName(data.companyName);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const getNavItems = (): NavItem[] => {
     switch (role) {
@@ -182,9 +194,9 @@ export function Sidebar() {
           isCollapsed ? "justify-center px-2" : "px-6"
         )}>
           {isCollapsed ? (
-            <span className="text-xl font-bold">C</span>
+            <span className="text-xl font-bold text-orange-500">{companyName.charAt(0)}</span>
           ) : (
-            <h1 className="text-xl font-bold">CrewKit</h1>
+            <h1 className="text-xl font-bold text-orange-500">{companyName}</h1>
           )}
         </div>
 
