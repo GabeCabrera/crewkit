@@ -5,7 +5,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardLayout allowedRoles={["ADMIN"]}>{children}</DashboardLayout>;
+  return <DashboardLayout allowedRoles={["SUPERUSER", "ADMIN"]}>{children}</DashboardLayout>;
 }
 
 

@@ -5,7 +5,7 @@ export default function FieldLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DashboardLayout allowedRoles={["FIELD", "MANAGER", "ADMIN"]}>{children}</DashboardLayout>;
+  return <DashboardLayout allowedRoles={["SUPERUSER", "ADMIN", "MANAGER", "FIELD"]}>{children}</DashboardLayout>;
 }
 
 
