@@ -24,6 +24,8 @@ import { cn, formatCurrency } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 
 interface Equipment {
@@ -406,9 +408,13 @@ export default function FieldAssembliesPage() {
 
       {/* Bottom Sheet for Assembly Details */}
       <Sheet open={!!selectedAssembly} onOpenChange={() => setSelectedAssembly(null)}>
-        <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0 max-h-[85vh]">
+        <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-0 max-h-[85vh]" aria-describedby={undefined}>
           {selectedAssembly && (
             <div className="flex flex-col h-full">
+              {/* Visually hidden title for accessibility */}
+              <SheetTitle className="sr-only">
+                Log Assembly: {selectedAssembly.name}
+              </SheetTitle>
               {/* Header */}
               <div className="px-5 sm:px-6 pb-4 border-b">
                 <div className="flex items-start gap-3 sm:gap-4">

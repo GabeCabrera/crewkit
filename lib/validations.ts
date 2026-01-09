@@ -80,10 +80,15 @@ export const updateAssemblySchema = z.object({
 // ==========================================
 // Assembly Usage Schema
 // ==========================================
+export const assemblyUsageModifierSchema = z.object({
+  equipmentId: z.string().cuid("Invalid equipment ID"),
+  quantity: z.number().int().min(1, "Quantity must be at least 1"),
+});
+
 export const createAssemblyUsageSchema = z.object({
   assemblyId: z.string().cuid("Invalid assembly ID"),
   quantity: z.number().int().min(1, "Quantity must be at least 1").default(1),
-  modifiers: z.record(z.any()).optional().nullable(),
+  modifiers: z.array(assemblyUsageModifierSchema).optional().nullable(),
   date: z.string().datetime().optional(),
 });
 
