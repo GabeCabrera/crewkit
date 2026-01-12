@@ -37,6 +37,12 @@ interface Equipment {
   sku: string;
   pricePerUnit: number;
   unitType?: string;
+  inventory?: { quantity: number } | null;
+}
+
+interface Modifier {
+  equipmentId: string;
+  quantity: number;
 }
 
 interface AssemblyItem {
@@ -83,6 +89,7 @@ export default function FieldAssembliesPage() {
   const [categories, setCategories] = useState<AssemblyCategory[]>([]);
   const [types, setTypes] = useState<AssemblyType[]>([]);
   const [recentAssemblies, setRecentAssemblies] = useState<Assembly[]>([]);
+  const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Flow state
@@ -97,6 +104,8 @@ export default function FieldAssembliesPage() {
   // Assembly selection
   const [selectedAssembly, setSelectedAssembly] = useState<Assembly | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [modifiers, setModifiers] = useState<Modifier[]>([]);
+  const [showModifiers, setShowModifiers] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [showAllItems, setShowAllItems] = useState(false);
@@ -106,22 +115,25 @@ export default function FieldAssembliesPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [assembliesRes, categoriesRes, typesRes, recentRes] = await Promise.all([
+        const [assembliesRes, categoriesRes, typesRes, recentRes, equipmentRes] = await Promise.all([
           fetch("/api/assemblies?approved=true&all=true"),
           fetch("/api/assembly-categories"),
           fetch("/api/assembly-types"),
           fetch("/api/assemblies/recent?limit=4"),
+          fetch("/api/equipment?all=true"),
         ]);
         
         const assembliesData = await assembliesRes.json();
         const categoriesData = await categoriesRes.json();
         const typesData = await typesRes.json();
         const recentData = await recentRes.json();
+        const equipmentData = await equipmentRes.json();
         
         if (Array.isArray(assembliesData)) setAssemblies(assembliesData);
         if (Array.isArray(categoriesData)) setCategories(categoriesData);
         if (Array.isArray(typesData)) setTypes(typesData);
         if (Array.isArray(recentData)) setRecentAssemblies(recentData);
+        if (Array.isArray(equipmentData)) setAllEquipment(equipmentData);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -227,26 +239,31 @@ export default function FieldAssembliesPage() {
   const handleSelectAssembly = (assembly: Assembly) => {
     setSelectedAssembly(assembly);
     setQuantity(1);
+    setModifiers([]);
+    setShowModifiers(false);
     setShowAllItems(false);
   };
 
-  const handleQuickLog = async (assembly: Assembly, qty: number = 1) => {
+  const handleQuickLog = async (assembly: Assembly, qty: number = 1, mods: Modifier[] = []) => {
     setIsSubmitting(true);
     try {
+      const validModifiers = mods.filter(m => m.equipmentId && m.quantity > 0);
       const response = await fetch("/api/assemblies/usage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           assemblyId: assembly.id, 
           quantity: qty,
-          modifiers: [] 
+          modifiers: validModifiers 
         }),
       });
 
       if (!response.ok) throw new Error("Failed to log usage");
 
-      setSuccess(`${qty}× ${assembly.name}`);
+      const modifierText = validModifiers.length > 0 ? ` + ${validModifiers.length} extras` : "";
+      setSuccess(`${qty}× ${assembly.name}${modifierText}`);
       setSelectedAssembly(null);
+      setModifiers([]);
       
       // Refresh recent assemblies
       const recentRes = await fetch("/api/assemblies/recent?limit=4");
@@ -263,9 +280,43 @@ export default function FieldAssembliesPage() {
     }
   };
 
+  // Modifier helpers
+  const addModifier = () => {
+    setModifiers([...modifiers, { equipmentId: "", quantity: 1 }]);
+    setShowModifiers(true);
+  };
+
+  const removeModifier = (index: number) => {
+    setModifiers(modifiers.filter((_, i) => i !== index));
+  };
+
+  const updateModifier = (index: number, field: keyof Modifier, value: string | number) => {
+    const newModifiers = [...modifiers];
+    newModifiers[index] = { ...newModifiers[index], [field]: value };
+    setModifiers(newModifiers);
+  };
+
+  // Get available equipment for modifiers (not already in assembly or selected)
+  const availableForModifiers = useMemo(() => {
+    if (!selectedAssembly) return allEquipment;
+    const usedIds = new Set([
+      ...selectedAssembly.items.map(i => i.equipment.id),
+      ...modifiers.map(m => m.equipmentId).filter(Boolean),
+    ]);
+    return allEquipment.filter(eq => !usedIds.has(eq.id));
+  }, [allEquipment, selectedAssembly, modifiers]);
+
+  // Calculate modifier cost
+  const modifiersCost = useMemo(() => {
+    return modifiers.reduce((total, mod) => {
+      const eq = allEquipment.find(e => e.id === mod.equipmentId);
+      return total + (eq ? eq.pricePerUnit * mod.quantity : 0);
+    }, 0);
+  }, [modifiers, allEquipment]);
+
   const handleConfirmUsage = async () => {
     if (!selectedAssembly) return;
-    await handleQuickLog(selectedAssembly, quantity);
+    await handleQuickLog(selectedAssembly, quantity, modifiers);
   };
 
   const formatTimeAgo = (dateStr: string) => {
@@ -785,7 +836,7 @@ export default function FieldAssembliesPage() {
                 </div>
 
                 {/* Items Preview */}
-                <div>
+                <div className="mb-5">
                   <button
                     onClick={() => setShowAllItems(!showAllItems)}
                     className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
@@ -809,16 +860,109 @@ export default function FieldAssembliesPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Extra Equipment (Modifiers) */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      onClick={() => setShowModifiers(!showModifiers)}
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", showModifiers && "rotate-180")} />
+                      Extra equipment
+                      {modifiers.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {modifiers.filter(m => m.equipmentId).length}
+                        </Badge>
+                      )}
+                    </button>
+                    <button
+                      onClick={addModifier}
+                      className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add
+                    </button>
+                  </div>
+                  
+                  {(showModifiers || modifiers.length > 0) && (
+                    <div className="space-y-2">
+                      {modifiers.map((mod, index) => {
+                        const selectedEquipment = allEquipment.find(e => e.id === mod.equipmentId);
+                        return (
+                          <div key={index} className="flex items-center gap-2 bg-muted/50 rounded-xl p-2">
+                            <select
+                              value={mod.equipmentId}
+                              onChange={(e) => updateModifier(index, "equipmentId", e.target.value)}
+                              className="flex-1 bg-background border rounded-lg px-2 py-1.5 text-sm min-w-0"
+                            >
+                              <option value="">Select equipment...</option>
+                              {selectedEquipment && (
+                                <option value={selectedEquipment.id}>
+                                  {selectedEquipment.name}
+                                </option>
+                              )}
+                              {availableForModifiers.map(eq => (
+                                <option key={eq.id} value={eq.id}>
+                                  {eq.name} ({formatCurrency(eq.pricePerUnit)})
+                                </option>
+                              ))}
+                            </select>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => updateModifier(index, "quantity", Math.max(1, mod.quantity - 1))}
+                                className="h-7 w-7 rounded-lg bg-background flex items-center justify-center"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-6 text-center text-sm font-medium">{mod.quantity}</span>
+                              <button
+                                onClick={() => updateModifier(index, "quantity", mod.quantity + 1)}
+                                className="h-7 w-7 rounded-lg bg-background flex items-center justify-center"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => removeModifier(index)}
+                              className="h-7 w-7 rounded-lg text-destructive hover:bg-destructive/10 flex items-center justify-center shrink-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                      
+                      {modifiers.length === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          Add extra equipment not included in the assembly
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Fixed Footer */}
               <div className="border-t bg-background px-5 sm:px-6 py-4 space-y-3">
-                {/* Total */}
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Total</span>
-                  <span className="text-xl sm:text-2xl font-bold">
-                    {formatCurrency(getAssemblyTotal(selectedAssembly) * quantity)}
-                  </span>
+                {/* Cost Breakdown */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Assembly ({quantity}×)</span>
+                    <span>{formatCurrency(getAssemblyTotal(selectedAssembly) * quantity)}</span>
+                  </div>
+                  {modifiersCost > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Extra equipment</span>
+                      <span>{formatCurrency(modifiersCost)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="font-medium">Total</span>
+                    <span className="text-xl sm:text-2xl font-bold">
+                      {formatCurrency(getAssemblyTotal(selectedAssembly) * quantity + modifiersCost)}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Action Button */}
@@ -833,6 +977,11 @@ export default function FieldAssembliesPage() {
                     <>
                       <Check className="h-5 w-5 mr-2" />
                       Log {quantity}× {selectedAssembly.name}
+                      {modifiers.filter(m => m.equipmentId).length > 0 && (
+                        <span className="ml-1 text-primary-foreground/80">
+                          + {modifiers.filter(m => m.equipmentId).length} extra
+                        </span>
+                      )}
                     </>
                   )}
                 </Button>

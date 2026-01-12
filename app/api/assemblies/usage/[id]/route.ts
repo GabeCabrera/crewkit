@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = 'force-dynamic';
 
-// DELETE /api/assemblies/usage/[id] - Delete a usage log and restore inventory
-export async function DELETE(
+// GET /api/assemblies/usage/[id] - Get a single usage log
+export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -16,11 +16,65 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
-
-    // Find the usage log
     const usageLog = await prisma.assemblyUsageLog.findUnique({
-      where: { id },
+      where: { id: params.id },
+      include: {
+        assembly: {
+          include: {
+            items: {
+              include: {
+                equipment: true,
+              },
+            },
+            category: true,
+            type: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!usageLog) {
+      return NextResponse.json({ error: "Usage log not found" }, { status: 404 });
+    }
+
+    // Only allow the user who created it or admins/managers to view
+    if (
+      usageLog.userId !== session.user.id &&
+      !["SUPERUSER", "ADMIN", "MANAGER"].includes(session.user.role)
+    ) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    return NextResponse.json(usageLog);
+  } catch (error) {
+    console.error("Error fetching usage log:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch usage log" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/assemblies/usage/[id] - Update modifiers on a usage log
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const usageLog = await prisma.assemblyUsageLog.findUnique({
+      where: { id: params.id },
       include: {
         assembly: {
           include: {
@@ -35,42 +89,159 @@ export async function DELETE(
     });
 
     if (!usageLog) {
-      return NextResponse.json(
-        { error: "Usage log not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Usage log not found" }, { status: 404 });
     }
 
-    // Only the user who created the log or an admin can delete it
-    const currentUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
+    // Only allow the user who created it or admins/managers to edit
+    if (
+      usageLog.userId !== session.user.id &&
+      !["SUPERUSER", "ADMIN", "MANAGER"].includes(session.user.role)
+    ) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { modifiers } = body;
+
+    // Get old modifiers
+    const oldModifiers = (usageLog.modifiers as any[]) || [];
+
+    // Reverse old modifier inventory changes
+    for (const oldMod of oldModifiers) {
+      if (oldMod.equipmentId && oldMod.quantity > 0) {
+        const inventory = await prisma.inventory.findUnique({
+          where: { equipmentId: oldMod.equipmentId },
+        });
+        
+        if (inventory) {
+          await prisma.inventory.update({
+            where: { equipmentId: oldMod.equipmentId },
+            data: { quantity: inventory.quantity + oldMod.quantity },
+          });
+        }
+      }
+    }
+
+    // Apply new modifier inventory changes
+    if (modifiers && Array.isArray(modifiers)) {
+      for (const modifier of modifiers) {
+        if (modifier.equipmentId && modifier.quantity > 0) {
+          const inventory = await prisma.inventory.findUnique({
+            where: { equipmentId: modifier.equipmentId },
+          });
+
+          if (inventory) {
+            const newQuantity = inventory.quantity - modifier.quantity;
+            if (newQuantity < 0) {
+              // Rollback: restore old modifiers
+              for (const oldMod of oldModifiers) {
+                if (oldMod.equipmentId && oldMod.quantity > 0) {
+                  const inv = await prisma.inventory.findUnique({
+                    where: { equipmentId: oldMod.equipmentId },
+                  });
+                  if (inv) {
+                    await prisma.inventory.update({
+                      where: { equipmentId: oldMod.equipmentId },
+                      data: { quantity: inv.quantity - oldMod.quantity },
+                    });
+                  }
+                }
+              }
+              return NextResponse.json(
+                { error: "Insufficient inventory for modifier equipment" },
+                { status: 400 }
+              );
+            }
+
+            await prisma.inventory.update({
+              where: { equipmentId: modifier.equipmentId },
+              data: { quantity: newQuantity },
+            });
+          }
+        }
+      }
+    }
+
+    // Update the usage log
+    const updatedLog = await prisma.assemblyUsageLog.update({
+      where: { id: params.id },
+      data: {
+        modifiers: modifiers || null,
+      },
+      include: {
+        assembly: {
+          include: {
+            items: {
+              include: {
+                equipment: true,
+              },
+            },
+            category: true,
+            type: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
 
-    if (usageLog.userId !== session.user.id && !["ADMIN", "SUPERUSER"].includes(currentUser?.role || "")) {
-      return NextResponse.json(
-        { error: "You can only delete your own usage logs" },
-        { status: 403 }
-      );
+    return NextResponse.json(updatedLog);
+  } catch (error) {
+    console.error("Error updating usage log:", error);
+    return NextResponse.json(
+      { error: "Failed to update usage log" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/assemblies/usage/[id] - Delete a usage log and restore inventory
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if the log is from today (field users can only delete same-day logs)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const logDate = new Date(usageLog.date);
-    logDate.setHours(0, 0, 0, 0);
+    const usageLog = await prisma.assemblyUsageLog.findUnique({
+      where: { id: params.id },
+      include: {
+        assembly: {
+          include: {
+            items: {
+              include: {
+                equipment: true,
+              },
+            },
+          },
+        },
+      },
+    });
 
-    if (logDate.getTime() !== today.getTime() && currentUser?.role === "FIELD") {
-      return NextResponse.json(
-        { error: "You can only delete today's usage logs" },
-        { status: 403 }
-      );
+    if (!usageLog) {
+      return NextResponse.json({ error: "Usage log not found" }, { status: 404 });
     }
 
-    // Restore inventory for each item in the assembly
+    // Only allow the user who created it or admins/managers to delete
+    if (
+      usageLog.userId !== session.user.id &&
+      !["SUPERUSER", "ADMIN", "MANAGER"].includes(session.user.role)
+    ) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    // Restore inventory for assembly items
     for (const item of usageLog.assembly.items) {
       const totalQuantity = item.quantity * usageLog.quantity;
-
+      
       const inventory = await prisma.inventory.findUnique({
         where: { equipmentId: item.equipmentId },
       });
@@ -87,16 +258,17 @@ export async function DELETE(
             equipmentId: item.equipmentId,
             userId: session.user.id,
             quantity: totalQuantity,
-            type: "ADJUSTED",
+            type: "RETURNED",
             notes: `Restored from deleted usage: ${usageLog.assembly.name}`,
           },
         });
       }
     }
 
-    // Restore inventory for modifiers if any
-    if (usageLog.modifiers && Array.isArray(usageLog.modifiers)) {
-      for (const modifier of usageLog.modifiers as { equipmentId: string; quantity: number }[]) {
+    // Restore inventory for modifiers
+    const modifiers = (usageLog.modifiers as any[]) || [];
+    for (const modifier of modifiers) {
+      if (modifier.equipmentId && modifier.quantity > 0) {
         const inventory = await prisma.inventory.findUnique({
           where: { equipmentId: modifier.equipmentId },
         });
@@ -112,8 +284,8 @@ export async function DELETE(
               equipmentId: modifier.equipmentId,
               userId: session.user.id,
               quantity: modifier.quantity,
-              type: "ADJUSTED",
-              notes: `Restored from deleted usage modifier`,
+              type: "RETURNED",
+              notes: `Restored modifier from deleted usage: ${usageLog.assembly.name}`,
             },
           });
         }
@@ -122,7 +294,7 @@ export async function DELETE(
 
     // Delete the usage log
     await prisma.assemblyUsageLog.delete({
-      where: { id },
+      where: { id: params.id },
     });
 
     return NextResponse.json({ success: true });
@@ -134,4 +306,3 @@ export async function DELETE(
     );
   }
 }
-
