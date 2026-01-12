@@ -1033,6 +1033,72 @@ function DailyLogsTab() {
                 />
               </div>
 
+              {/* Crew Members */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Users className="h-4 w-4" /> Crew Members
+                </Label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Enter name and press Enter" 
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const input = e.target as HTMLInputElement;
+                        const name = input.value.trim();
+                        if (name && !editingLog.workersNames.includes(name)) {
+                          setEditingLog(prev => prev ? { 
+                            ...prev, 
+                            workersNames: [...prev.workersNames, name],
+                            workerCount: prev.workersNames.length + 1
+                          } : null);
+                          input.value = "";
+                        }
+                      }
+                    }}
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={(e) => {
+                      const input = (e.target as HTMLButtonElement).previousElementSibling as HTMLInputElement;
+                      const name = input.value.trim();
+                      if (name && !editingLog.workersNames.includes(name)) {
+                        setEditingLog(prev => prev ? { 
+                          ...prev, 
+                          workersNames: [...prev.workersNames, name],
+                          workerCount: prev.workersNames.length + 1
+                        } : null);
+                        input.value = "";
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {editingLog.workersNames.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {editingLog.workersNames.map((name, idx) => (
+                      <Badge key={idx} variant="secondary" className="pr-1">
+                        {name}
+                        <button 
+                          type="button" 
+                          onClick={() => setEditingLog(prev => prev ? { 
+                            ...prev, 
+                            workersNames: prev.workersNames.filter((_, i) => i !== idx),
+                            workerCount: prev.workersNames.length - 1
+                          } : null)} 
+                          className="ml-1 hover:bg-muted rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">{editingLog.workersNames.length} crew member{editingLog.workersNames.length !== 1 ? "s" : ""}</p>
+              </div>
+
               {/* Aerial Metrics */}
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-3">Aerial Work</h4>
