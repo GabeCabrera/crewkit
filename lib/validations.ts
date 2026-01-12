@@ -66,6 +66,8 @@ export const createAssemblySchema = z.object({
     .array(assemblyItemSchema)
     .min(1, "At least one item is required"),
   categories: z.array(z.string()).optional().default([]),
+  categoryId: z.string().cuid("Invalid category ID").optional().nullable(),
+  typeId: z.string().cuid("Invalid type ID").optional().nullable(),
   status: z.enum(["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED"]).optional(),
 });
 
@@ -74,6 +76,8 @@ export const updateAssemblySchema = z.object({
   description: z.string().max(1000).optional().nullable(),
   items: z.array(assemblyItemSchema).min(1).optional(),
   categories: z.array(z.string()).optional(),
+  categoryId: z.string().cuid("Invalid category ID").optional().nullable(),
+  typeId: z.string().cuid("Invalid type ID").optional().nullable(),
   status: z.enum(["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED"]).optional(),
 });
 

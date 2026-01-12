@@ -18,6 +18,12 @@ export async function GET(
     const assembly = await prisma.assembly.findUnique({
       where: { id: params.id },
       include: {
+        category: {
+          select: { id: true, name: true },
+        },
+        type: {
+          select: { id: true, name: true },
+        },
         items: {
           include: {
             equipment: true,
@@ -95,6 +101,8 @@ export async function PUT(
     if (description !== undefined) updateData.description = description;
     if (status !== undefined) updateData.status = status;
     if (body.categories !== undefined) updateData.categories = Array.isArray(body.categories) ? body.categories : [];
+    if (body.categoryId !== undefined) updateData.categoryId = body.categoryId || null;
+    if (body.typeId !== undefined) updateData.typeId = body.typeId || null;
 
     // If items are provided, delete existing and create new ones
     if (items && Array.isArray(items)) {
@@ -116,6 +124,12 @@ export async function PUT(
           },
         },
         include: {
+          category: {
+            select: { id: true, name: true },
+          },
+          type: {
+            select: { id: true, name: true },
+          },
           items: {
             include: {
               equipment: true,
@@ -139,6 +153,12 @@ export async function PUT(
       where: { id: params.id },
       data: updateData,
       include: {
+        category: {
+          select: { id: true, name: true },
+        },
+        type: {
+          select: { id: true, name: true },
+        },
         items: {
           include: {
             equipment: true,

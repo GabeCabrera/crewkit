@@ -9,12 +9,14 @@ import {
   Layers, 
   Search, 
   Command,
+  FolderTree,
 } from "lucide-react";
 import { TablePageSkeleton, PageContent } from "@/components/layout/page-skeleton";
 import { StatsCards } from "@/components/inventory/stats-cards";
 import { EquipmentTable } from "@/components/inventory/equipment-table";
 import { AssembliesTable } from "@/components/inventory/assemblies-table";
 import { GlobalSearch } from "@/components/inventory/global-search";
+import { CategoryTypeManager } from "@/components/inventory/category-type-manager";
 import { matchesWithSynonyms } from "@/lib/equipment-synonyms";
 
 export interface Equipment {
@@ -381,7 +383,7 @@ export default function InventoryPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
             <TabsTrigger value="equipment" className="gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Equipment</span>
@@ -391,6 +393,11 @@ export default function InventoryPage() {
               <Layers className="h-4 w-4" />
               <span className="hidden sm:inline">Assemblies</span>
               <span className="sm:hidden">Assem</span>
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="gap-2">
+              <FolderTree className="h-4 w-4" />
+              <span className="hidden sm:inline">Categories</span>
+              <span className="sm:hidden">Cats</span>
             </TabsTrigger>
           </TabsList>
 
@@ -425,6 +432,11 @@ export default function InventoryPage() {
               onRefresh={fetchAssemblies}
               onNavigateToEquipment={navigateToEquipment}
             />
+          </TabsContent>
+
+          {/* Categories & Types Tab */}
+          <TabsContent value="categories" className="space-y-4">
+            <CategoryTypeManager />
           </TabsContent>
         </Tabs>
 

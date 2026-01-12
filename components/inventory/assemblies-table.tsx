@@ -85,6 +85,21 @@ interface ItemInput {
   quantity: number;
 }
 
+interface AssemblyCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  _count: { types: number; assemblies: number };
+}
+
+interface AssemblyType {
+  id: string;
+  name: string;
+  description: string | null;
+  categoryId: string;
+  _count: { assemblies: number };
+}
+
 const statusColors = {
   DRAFT: "bg-gray-100 text-gray-700 border-gray-200",
   PENDING_APPROVAL: "bg-yellow-50 text-yellow-700 border-yellow-200",
@@ -260,16 +275,22 @@ export function AssembliesTable({
   const [flairFilter, setFlairFilter] = useState<string>("all");
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
-  const [formData, setFormData] = useState<{ name: string; description: string; status: Assembly["status"]; categories: string[] }>({
+  const [formData, setFormData] = useState<{ name: string; description: string; status: Assembly["status"]; categories: string[]; categoryId: string; typeId: string }>({
     name: "",
     description: "",
     status: "APPROVED" as Assembly["status"],
     categories: [],
+    categoryId: "",
+    typeId: "",
   });
   const [items, setItems] = useState<ItemInput[]>([{ equipmentId: "", quantity: 1 }]);
   const [existingCategories, setExistingCategories] = useState<string[]>([]);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [categoryInput, setCategoryInput] = useState("");
+  
+  // New structured categories and types
+  const [structuredCategories, setStructuredCategories] = useState<AssemblyCategory[]>([]);
+  const [structuredTypes, setStructuredTypes] = useState<AssemblyType[]>([]);
 
   // Fetch existing categories on mount
   useEffect(() => {
@@ -286,6 +307,34 @@ export function AssembliesTable({
     };
     fetchCategories();
   }, []);
+
+  // Fetch structured categories and types
+  useEffect(() => {
+    const fetchStructuredData = async () => {
+      try {
+        const [catRes, typeRes] = await Promise.all([
+          fetch("/api/assembly-categories"),
+          fetch("/api/assembly-types"),
+        ]);
+        if (catRes.ok) {
+          const cats = await catRes.json();
+          setStructuredCategories(cats);
+        }
+        if (typeRes.ok) {
+          const types = await typeRes.json();
+          setStructuredTypes(types);
+        }
+      } catch (error) {
+        console.error("Error fetching structured categories/types:", error);
+      }
+    };
+    fetchStructuredData();
+  }, []);
+
+  // Filter types by selected category
+  const filteredTypes = formData.categoryId
+    ? structuredTypes.filter((t) => t.categoryId === formData.categoryId)
+    : structuredTypes;
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows);
@@ -318,6 +367,8 @@ export function AssembliesTable({
           description: formData.description || null,
           status: formData.status,
           categories: formData.categories,
+          categoryId: formData.categoryId || null,
+          typeId: formData.typeId || null,
           items: validItems,
         }),
       });
@@ -339,6 +390,8 @@ export function AssembliesTable({
       description: assembly.description || "",
       status: assembly.status,
       categories: (assembly as any).categories || [],
+      categoryId: (assembly as any).categoryId || "",
+      typeId: (assembly as any).typeId || "",
     });
     setItems(
       assembly.items.map(item => ({
@@ -357,6 +410,8 @@ export function AssembliesTable({
       description: assembly.description || "",
       status: "DRAFT" as Assembly["status"], // New copies start as draft
       categories: [],
+      categoryId: (assembly as any).categoryId || "",
+      typeId: (assembly as any).typeId || "",
     });
     setItems([
       ...assembly.items.map(item => ({
@@ -415,6 +470,8 @@ export function AssembliesTable({
       description: "",
       status: "APPROVED",
       categories: [],
+      categoryId: "",
+      typeId: "",
     });
     setItems([{ equipmentId: "", quantity: 1 }]);
   };
@@ -619,8 +676,60 @@ export function AssembliesTable({
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  {/* Structured Category and Type */}
+                  {structuredCategories.length > 0 && (
+                    <div className="grid gap-4 p-3 bg-muted/30 rounded-lg border">
+                      <div className="grid gap-2">
+                        <Label htmlFor="categoryId">Category</Label>
+                        <Select
+                          value={formData.categoryId}
+                          onValueChange={(value) => setFormData({ 
+                            ...formData, 
+                            categoryId: value,
+                            typeId: "", // Reset type when category changes
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {structuredCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {formData.categoryId && filteredTypes.length > 0 && (
+                        <div className="grid gap-2">
+                          <Label htmlFor="typeId">Type</Label>
+                          <Select
+                            value={formData.typeId}
+                            onValueChange={(value) => setFormData({ ...formData, typeId: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {filteredTypes.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="grid gap-2">
-                    <Label>Flairs (Categories)</Label>
+                    <Label>Flairs (Legacy)</Label>
                     {/* Display selected flairs */}
                     {formData.categories.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-2">

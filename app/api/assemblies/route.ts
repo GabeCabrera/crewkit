@@ -39,6 +39,14 @@ export async function GET(request: NextRequest) {
           description: true,
           status: true,
           categories: true,
+          categoryId: true,
+          typeId: true,
+          category: {
+            select: { id: true, name: true },
+          },
+          type: {
+            select: { id: true, name: true },
+          },
           items: {
             select: {
               id: true,
@@ -79,6 +87,14 @@ export async function GET(request: NextRequest) {
           description: true,
           status: true,
           categories: true,
+          categoryId: true,
+          typeId: true,
+          category: {
+            select: { id: true, name: true },
+          },
+          type: {
+            select: { id: true, name: true },
+          },
           createdAt: true,
           items: {
             select: {
@@ -153,7 +169,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, description, items, categories, status } = validation.data;
+    const { name, description, items, categories, status, categoryId, typeId } = validation.data;
 
     // Determine status based on role
     let assemblyStatus = status || "DRAFT";
@@ -169,6 +185,8 @@ export async function POST(request: NextRequest) {
         description,
         status: assemblyStatus,
         categories: categories || [],
+        categoryId: categoryId || null,
+        typeId: typeId || null,
         createdById: session.user.id,
         items: {
           create: items.map((item) => ({
@@ -183,6 +201,14 @@ export async function POST(request: NextRequest) {
         description: true,
         status: true,
         categories: true,
+        categoryId: true,
+        typeId: true,
+        category: {
+          select: { id: true, name: true },
+        },
+        type: {
+          select: { id: true, name: true },
+        },
         createdAt: true,
         items: {
           select: {

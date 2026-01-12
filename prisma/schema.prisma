@@ -92,18 +92,52 @@ model Inventory {
   updatedAt   DateTime @updatedAt
 }
 
+model AssemblyCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  types       AssemblyType[]
+  assemblies  Assembly[]
+}
+
+model AssemblyType {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  order       Int      @default(0)
+  categoryId  String
+  category    AssemblyCategory @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  assemblies  Assembly[]
+  
+  @@unique([name, categoryId])
+}
+
 model Assembly {
   id          String          @id @default(cuid())
   name        String
   description String?
   status      AssemblyStatus  @default(DRAFT)
-  categories  String[]        @default([])
+  categories  String[]        @default([])  // DEPRECATED: kept for migration
+  categoryId  String?
+  category    AssemblyCategory? @relation(fields: [categoryId], references: [id])
+  typeId      String?
+  type        AssemblyType? @relation(fields: [typeId], references: [id])
   createdById String
   createdBy   User            @relation(fields: [createdById], references: [id])
   createdAt   DateTime        @default(now())
   updatedAt   DateTime         @updatedAt
   items       AssemblyItem[]
   usageLogs   AssemblyUsageLog[]
+  
+  @@index([categoryId])
+  @@index([typeId])
 }
 
 model AssemblyItem {
