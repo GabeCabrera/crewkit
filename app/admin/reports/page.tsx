@@ -371,6 +371,7 @@ function DailyLogsTab() {
   const [deleting, setDeleting] = useState(false);
   const [assemblyUsage, setAssemblyUsage] = useState<AssemblyUsageData | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
+  const [workerInputValue, setWorkerInputValue] = useState("");
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -478,7 +479,20 @@ function DailyLogsTab() {
 
   const handleOpenEdit = (log: FieldWorkLog) => {
     setEditingLog({ ...log });
+    setWorkerInputValue("");
     setEditDialogOpen(true);
+  };
+
+  const handleAddWorkerToEdit = () => {
+    const name = workerInputValue.trim();
+    if (name && editingLog && !editingLog.workersNames.includes(name)) {
+      setEditingLog(prev => prev ? { 
+        ...prev, 
+        workersNames: [...prev.workersNames, name],
+        workerCount: prev.workersNames.length + 1
+      } : null);
+      setWorkerInputValue("");
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -1040,19 +1054,14 @@ function DailyLogsTab() {
                 </Label>
                 <div className="flex gap-2">
                   <Input 
-                    placeholder="Enter name and press Enter" 
+                    placeholder="Enter name and press Enter or Tab" 
+                    value={workerInputValue}
+                    onChange={(e) => setWorkerInputValue(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const input = e.target as HTMLInputElement;
-                        const name = input.value.trim();
-                        if (name && !editingLog.workersNames.includes(name)) {
-                          setEditingLog(prev => prev ? { 
-                            ...prev, 
-                            workersNames: [...prev.workersNames, name],
-                            workerCount: prev.workersNames.length + 1
-                          } : null);
-                          input.value = "";
+                      if (e.key === "Enter" || e.key === "Tab") {
+                        if (workerInputValue.trim()) {
+                          e.preventDefault();
+                          handleAddWorkerToEdit();
                         }
                       }
                     }}
@@ -1060,18 +1069,7 @@ function DailyLogsTab() {
                   <Button 
                     type="button" 
                     variant="outline"
-                    onClick={(e) => {
-                      const input = (e.target as HTMLButtonElement).previousElementSibling as HTMLInputElement;
-                      const name = input.value.trim();
-                      if (name && !editingLog.workersNames.includes(name)) {
-                        setEditingLog(prev => prev ? { 
-                          ...prev, 
-                          workersNames: [...prev.workersNames, name],
-                          workerCount: prev.workersNames.length + 1
-                        } : null);
-                        input.value = "";
-                      }
-                    }}
+                    onClick={handleAddWorkerToEdit}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
