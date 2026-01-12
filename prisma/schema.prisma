@@ -51,6 +51,7 @@ model User {
   assemblyUsageLogs AssemblyUsageLog[]
   createdTeams  Team[]   @relation("TeamCreator")
   createdReports EndOfDayReport[] @relation("ReportCreator")
+  createdFieldReports FieldWorkLog[] @relation("FieldReportCreator")
 }
 
 model Team {
@@ -62,6 +63,7 @@ model Team {
   creator   User     @relation("TeamCreator", fields: [creatorId], references: [id])
   members   User[]
   reports   EndOfDayReport[]
+  fieldReports FieldWorkLog[]
 }
 
 model Equipment {
@@ -187,6 +189,12 @@ model FieldWorkLog {
   workerCount     Int       @default(0)
   hoursWorked     Float     @default(0)
   
+  // Team and user tracking
+  teamId          String?
+  team            Team?    @relation(fields: [teamId], references: [id])
+  createdById     String?
+  createdBy       User?    @relation("FieldReportCreator", fields: [createdById], references: [id])
+  
   // Aerial construction metrics
   strandHungFootage     Float?    // Strand hung (feet)
   polesAttached         Int?      // Number of poles attached to
@@ -211,11 +219,12 @@ model FieldWorkLog {
   anchorsPlaced         Int?      // Anchors placed
   snowshoesPlaced       Int?      // Snowshoes placed
   
-  // Notes
+  // Notes and issues
   notes           String?
+  issues          String?             // Issues/blockers encountered
   submittedBy     String              // Name of person who submitted
   
-  // Optional link to EOD report
+  // Optional link to EOD report (deprecated, kept for migration)
   reportId        String?
   report          EndOfDayReport? @relation(fields: [reportId], references: [id])
   
@@ -227,4 +236,6 @@ model FieldWorkLog {
   
   @@index([date])
   @@index([location])
+  @@index([teamId])
+  @@index([createdById])
 }

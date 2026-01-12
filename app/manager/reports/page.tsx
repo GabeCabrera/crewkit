@@ -22,6 +22,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageContent } from "@/components/layout/page-skeleton";
@@ -47,6 +48,10 @@ import {
   Layers,
   Users,
   Calendar,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -72,7 +77,12 @@ interface FieldWorkLog {
   risersInstalled: number | null;
   spliceCases: number | null;
   notes: string | null;
+  issues: string | null;
   submittedBy: string;
+  teamId: string | null;
+  team: { id: string; name: string } | null;
+  createdById: string | null;
+  createdBy: { id: string; name: string | null; email: string } | null;
 }
 
 interface FieldSummary {
@@ -797,6 +807,7 @@ function SubmitLogTab() {
     drilledFootage: "",
     plowedFootage: "",
     notes: "",
+    issues: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -848,31 +859,29 @@ function SubmitLogTab() {
 
     try {
       const payload = {
-        rows: [{
-          location: formData.location,
-          workers: formData.workers.join(","),
-          workerCount: formData.workers.length.toString(),
-          hoursWorked: formData.hoursWorked || "0",
-          strandHungFootage: formData.strandHungFootage || null,
-          polesAttached: formData.polesAttached || null,
-          fiberLashedFootage: formData.fiberLashedFootage || null,
-          fiberPulledFootage: formData.fiberPulledFootage || null,
-          mstsInstalled: formData.mstsInstalled || null,
-          risersInstalled: formData.risersInstalled || null,
-          spliceCases: formData.spliceCases || null,
-          guysPlaced: formData.guysPlaced || null,
-          slackLoops: formData.slackLoops || null,
-          handholesPlaced: formData.handholesPlaced || null,
-          vaultsPlaced: formData.vaultsPlaced || null,
-          drilledFootage: formData.drilledFootage || null,
-          plowedFootage: formData.plowedFootage || null,
-          notes: formData.notes || null,
-          submittedBy: "Manager",
-          timestamp: new Date(formData.date).toISOString(),
-        }],
+        date: formData.date,
+        location: formData.location,
+        workersNames: formData.workers,
+        workerCount: formData.workers.length,
+        hoursWorked: parseFloat(formData.hoursWorked) || 0,
+        strandHungFootage: formData.strandHungFootage ? parseFloat(formData.strandHungFootage) : null,
+        polesAttached: formData.polesAttached ? parseInt(formData.polesAttached) : null,
+        fiberLashedFootage: formData.fiberLashedFootage ? parseFloat(formData.fiberLashedFootage) : null,
+        fiberPulledFootage: formData.fiberPulledFootage ? parseFloat(formData.fiberPulledFootage) : null,
+        mstsInstalled: formData.mstsInstalled ? parseInt(formData.mstsInstalled) : null,
+        risersInstalled: formData.risersInstalled ? parseInt(formData.risersInstalled) : null,
+        spliceCases: formData.spliceCases ? parseInt(formData.spliceCases) : null,
+        guysPlaced: formData.guysPlaced ? parseInt(formData.guysPlaced) : null,
+        slackLoops: formData.slackLoops ? parseInt(formData.slackLoops) : null,
+        handholesPlaced: formData.handholesPlaced ? parseInt(formData.handholesPlaced) : null,
+        vaultsPlaced: formData.vaultsPlaced ? parseInt(formData.vaultsPlaced) : null,
+        drilledFootage: formData.drilledFootage ? parseFloat(formData.drilledFootage) : null,
+        plowedFootage: formData.plowedFootage ? parseFloat(formData.plowedFootage) : null,
+        notes: formData.notes || null,
+        issues: formData.issues || null,
       };
 
-      const response = await fetch("/api/reports/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const response = await fetch("/api/reports/field-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (response.ok) {
         setSuccess(true);
         setFormData({
@@ -880,7 +889,7 @@ function SubmitLogTab() {
           location: "", workers: [], workerInput: "", hoursWorked: "",
           strandHungFootage: "", polesAttached: "", fiberLashedFootage: "", fiberPulledFootage: "",
           mstsInstalled: "", risersInstalled: "", spliceCases: "", guysPlaced: "", slackLoops: "",
-          handholesPlaced: "", vaultsPlaced: "", drilledFootage: "", plowedFootage: "", notes: "",
+          handholesPlaced: "", vaultsPlaced: "", drilledFootage: "", plowedFootage: "", notes: "", issues: "",
         });
       }
     } catch { /* ignore */ } finally { setSubmitting(false); }
@@ -1042,7 +1051,15 @@ function SubmitLogTab() {
           {/* Notes */}
           <div className="space-y-2">
             <Label>Notes</Label>
-            <Textarea rows={3} placeholder="Any additional details, issues, or accomplishments..." value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} />
+            <Textarea rows={3} placeholder="Any additional details or accomplishments..." value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} />
+          </div>
+
+          {/* Issues */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" /> Issues / Blockers
+            </Label>
+            <Textarea rows={2} placeholder="Any problems, delays, or blockers encountered..." value={formData.issues} onChange={(e) => setFormData(prev => ({ ...prev, issues: e.target.value }))} />
           </div>
 
           <Button type="submit" className="w-full" size="lg" disabled={submitting || !formData.location}>

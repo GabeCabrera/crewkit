@@ -115,12 +115,14 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { role: true },
+      select: { role: true, teamId: true },
     });
 
     if (!user || !["ADMIN", "SUPERUSER"].includes(user.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
+
+    const userId = session.user.id;
 
     const body = await request.json();
     const { rows } = body as { rows: ImportRow[] };
@@ -221,6 +223,8 @@ export async function POST(request: NextRequest) {
             notes: row.notes?.trim() || null,
             submittedBy: row.submittedBy?.replace(/^@/, "").trim() || "Unknown",
             originalTimestamp: parsedDate,
+            createdById: userId,
+            teamId: user.teamId,
           },
         });
 

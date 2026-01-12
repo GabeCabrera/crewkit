@@ -49,6 +49,10 @@ import {
   Check,
   Layers,
   Users,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 
@@ -74,7 +78,28 @@ interface FieldWorkLog {
   risersInstalled: number | null;
   spliceCases: number | null;
   notes: string | null;
+  issues: string | null;
   submittedBy: string;
+  teamId: string | null;
+  team: { id: string; name: string } | null;
+  createdById: string | null;
+  createdBy: { id: string; name: string | null; email: string } | null;
+}
+
+interface AssemblyUsageData {
+  logs: {
+    id: string;
+    quantity: number;
+    assembly: {
+      id: string;
+      name: string;
+      items: { id: string; quantity: number; equipment: { id: string; name: string; sku: string; pricePerUnit: number } }[];
+    };
+    user: { id: string; name: string | null; email: string };
+  }[];
+  totalAssemblies: number;
+  totalItems: number;
+  totalCost: number;
 }
 
 interface FieldSummary {
@@ -340,6 +365,12 @@ function DailyLogsTab() {
   const [diagnoseData, setDiagnoseData] = useState<DiagnoseData | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [cleanResult, setCleanResult] = useState<{ deleted: number; remaining: number } | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingLog, setEditingLog] = useState<FieldWorkLog | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [assemblyUsage, setAssemblyUsage] = useState<AssemblyUsageData | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -421,6 +452,93 @@ function DailyLogsTab() {
       console.error("Error clearing logs:", error);
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const fetchReportDetail = async (id: string) => {
+    setLoadingUsage(true);
+    setAssemblyUsage(null);
+    try {
+      const response = await fetch(`/api/reports/field-logs/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAssemblyUsage(data.assemblyUsage || null);
+      }
+    } catch (error) {
+      console.error("Error fetching report detail:", error);
+    } finally {
+      setLoadingUsage(false);
+    }
+  };
+
+  const handleOpenDetail = (log: FieldWorkLog) => {
+    setSelectedLog(log);
+    fetchReportDetail(log.id);
+  };
+
+  const handleOpenEdit = (log: FieldWorkLog) => {
+    setEditingLog({ ...log });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingLog) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/reports/field-logs/${editingLog.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: editingLog.date,
+          location: editingLog.location,
+          workersNames: editingLog.workersNames,
+          workerCount: editingLog.workerCount,
+          hoursWorked: editingLog.hoursWorked,
+          strandHungFootage: editingLog.strandHungFootage,
+          polesAttached: editingLog.polesAttached,
+          fiberLashedFootage: editingLog.fiberLashedFootage,
+          fiberPulledFootage: editingLog.fiberPulledFootage,
+          drilledFootage: editingLog.drilledFootage,
+          plowedFootage: editingLog.plowedFootage,
+          handholesPlaced: editingLog.handholesPlaced,
+          vaultsPlaced: editingLog.vaultsPlaced,
+          mstsInstalled: editingLog.mstsInstalled,
+          guysPlaced: editingLog.guysPlaced,
+          slackLoops: editingLog.slackLoops,
+          risersInstalled: editingLog.risersInstalled,
+          spliceCases: editingLog.spliceCases,
+          notes: editingLog.notes,
+          issues: editingLog.issues,
+          submittedBy: editingLog.submittedBy,
+        }),
+      });
+      if (response.ok) {
+        setEditDialogOpen(false);
+        setEditingLog(null);
+        fetchLogs();
+      }
+    } catch (error) {
+      console.error("Error saving edit:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this report? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/reports/field-logs/${id}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setSelectedLog(null);
+        fetchLogs();
+      }
+    } catch (error) {
+      console.error("Error deleting report:", error);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -678,11 +796,12 @@ function DailyLogsTab() {
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <tr key={log.id} className="border-b last:border-0 hover:bg-muted/50 cursor-pointer" onClick={() => setSelectedLog(log)}>
+                  <tr key={log.id} className="border-b last:border-0 hover:bg-muted/50 cursor-pointer" onClick={() => handleOpenDetail(log)}>
                     <td className="py-3 text-xs font-medium">{formatDate(log.date)}</td>
                     <td className="py-3 font-medium max-w-[200px] truncate">
                       {log.location}
                       {log.notes && <StickyNote className="inline h-3 w-3 ml-1 text-amber-500" />}
+                      {log.issues && <AlertTriangle className="inline h-3 w-3 ml-1 text-red-500" />}
                     </td>
                     <td className="py-3 text-center"><Badge variant="secondary" className="font-mono">{log.workerCount}</Badge></td>
                     <td className="py-3 text-center font-mono">{log.hoursWorked}h</td>
@@ -705,13 +824,25 @@ function DailyLogsTab() {
       </Card>
 
       {/* Detail Dialog */}
-      <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
+      <Dialog open={!!selectedLog} onOpenChange={() => { setSelectedLog(null); setAssemblyUsage(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedLog && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />{selectedLog.location}</DialogTitle>
-                <DialogDescription>{formatDate(selectedLog.date)} • Submitted by {selectedLog.submittedBy}</DialogDescription>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <DialogTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" />{selectedLog.location}</DialogTitle>
+                    <DialogDescription>{formatDate(selectedLog.date)} • Submitted by {selectedLog.submittedBy}</DialogDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(selectedLog)}>
+                      <Pencil className="h-4 w-4 mr-1" /> Edit
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(selectedLog.id)} disabled={deleting} className="text-red-600 hover:text-red-700">
+                      {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 {/* Crew */}
@@ -792,6 +923,48 @@ function DailyLogsTab() {
                   )}
                 </div>
 
+                {/* Assembly Usage */}
+                <div className="border rounded-lg p-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                    <Package className="h-4 w-4" /> Equipment Used This Day
+                  </p>
+                  {loadingUsage ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : assemblyUsage && assemblyUsage.logs.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-orange-50 rounded-lg p-2">
+                          <p className="text-lg font-bold text-orange-700">{assemblyUsage.totalAssemblies}</p>
+                          <p className="text-xs text-orange-600">Assemblies</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-2">
+                          <p className="text-lg font-bold text-slate-700">{assemblyUsage.totalItems}</p>
+                          <p className="text-xs text-slate-600">Items</p>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg p-2">
+                          <p className="text-lg font-bold text-emerald-700">{formatCurrency(assemblyUsage.totalCost)}</p>
+                          <p className="text-xs text-emerald-600">Cost</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {assemblyUsage.logs.map((log) => (
+                          <div key={log.id} className="flex items-center justify-between text-sm border-b pb-2 last:border-0">
+                            <div>
+                              <p className="font-medium">{log.assembly.name}</p>
+                              <p className="text-xs text-muted-foreground">{log.user.name || log.user.email}</p>
+                            </div>
+                            <Badge variant="secondary" className="font-mono">{log.quantity}x</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-2">No equipment logged for this date</p>
+                  )}
+                </div>
+
                 {/* Notes */}
                 {selectedLog.notes && (
                   <div className="bg-muted/50 rounded-lg p-3">
@@ -799,9 +972,175 @@ function DailyLogsTab() {
                     <p className="text-sm whitespace-pre-wrap">{selectedLog.notes}</p>
                   </div>
                 )}
+
+                {/* Issues */}
+                {selectedLog.issues && (
+                  <div className="bg-red-50 rounded-lg p-3">
+                    <p className="text-xs font-medium mb-1 text-red-700 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> Issues / Blockers
+                    </p>
+                    <p className="text-sm whitespace-pre-wrap text-red-800">{selectedLog.issues}</p>
+                  </div>
+                )}
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Field Report</DialogTitle>
+            <DialogDescription>Update the details of this field work log</DialogDescription>
+          </DialogHeader>
+          {editingLog && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input 
+                    type="date" 
+                    value={editingLog.date.split("T")[0]} 
+                    onChange={(e) => setEditingLog(prev => prev ? { ...prev, date: e.target.value } : null)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Hours Worked</Label>
+                  <Input 
+                    type="number" 
+                    step="0.5" 
+                    value={editingLog.hoursWorked} 
+                    onChange={(e) => setEditingLog(prev => prev ? { ...prev, hoursWorked: parseFloat(e.target.value) || 0 } : null)} 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input 
+                  value={editingLog.location} 
+                  onChange={(e) => setEditingLog(prev => prev ? { ...prev, location: e.target.value } : null)} 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Submitted By</Label>
+                <Input 
+                  value={editingLog.submittedBy} 
+                  onChange={(e) => setEditingLog(prev => prev ? { ...prev, submittedBy: e.target.value } : null)} 
+                />
+              </div>
+
+              {/* Aerial Metrics */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Aerial Work</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Strand (ft)</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.strandHungFootage || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, strandHungFootage: e.target.value ? parseFloat(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Fiber Lashed (ft)</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.fiberLashedFootage || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, fiberLashedFootage: e.target.value ? parseFloat(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Fiber Pulled (ft)</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.fiberPulledFootage || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, fiberPulledFootage: e.target.value ? parseFloat(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Poles Attached</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.polesAttached || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, polesAttached: e.target.value ? parseInt(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Infrastructure Metrics */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Infrastructure</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">MSTs</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.mstsInstalled || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, mstsInstalled: e.target.value ? parseInt(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Risers</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.risersInstalled || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, risersInstalled: e.target.value ? parseInt(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Splice Cases</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.spliceCases || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, spliceCases: e.target.value ? parseInt(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Guys Placed</Label>
+                    <Input 
+                      type="number" 
+                      value={editingLog.guysPlaced || ""} 
+                      onChange={(e) => setEditingLog(prev => prev ? { ...prev, guysPlaced: e.target.value ? parseInt(e.target.value) : null } : null)} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Textarea 
+                  rows={3} 
+                  value={editingLog.notes || ""} 
+                  onChange={(e) => setEditingLog(prev => prev ? { ...prev, notes: e.target.value || null } : null)} 
+                />
+              </div>
+
+              {/* Issues */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500" /> Issues / Blockers
+                </Label>
+                <Textarea 
+                  rows={2} 
+                  placeholder="Any problems, delays, or blockers encountered..."
+                  value={editingLog.issues || ""} 
+                  onChange={(e) => setEditingLog(prev => prev ? { ...prev, issues: e.target.value || null } : null)} 
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Changes"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
@@ -830,6 +1169,7 @@ function SubmitReportTab() {
     drilledFootage: "",
     plowedFootage: "",
     notes: "",
+    issues: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -847,31 +1187,29 @@ function SubmitReportTab() {
 
     try {
       const payload = {
-        rows: [{
-          location: formData.location,
-          workers: formData.workers.join(","),
-          workerCount: formData.workers.length.toString(),
-          hoursWorked: formData.hoursWorked || "0",
-          strandHungFootage: formData.strandHungFootage || null,
-          polesAttached: formData.polesAttached || null,
-          fiberLashedFootage: formData.fiberLashedFootage || null,
-          fiberPulledFootage: formData.fiberPulledFootage || null,
-          mstsInstalled: formData.mstsInstalled || null,
-          risersInstalled: formData.risersInstalled || null,
-          spliceCases: formData.spliceCases || null,
-          guysPlaced: formData.guysPlaced || null,
-          slackLoops: formData.slackLoops || null,
-          handholesPlaced: formData.handholesPlaced || null,
-          vaultsPlaced: formData.vaultsPlaced || null,
-          drilledFootage: formData.drilledFootage || null,
-          plowedFootage: formData.plowedFootage || null,
-          notes: formData.notes || null,
-          submittedBy: "Admin",
-          timestamp: new Date(formData.date).toISOString(),
-        }],
+        date: formData.date,
+        location: formData.location,
+        workersNames: formData.workers,
+        workerCount: formData.workers.length,
+        hoursWorked: parseFloat(formData.hoursWorked) || 0,
+        strandHungFootage: formData.strandHungFootage ? parseFloat(formData.strandHungFootage) : null,
+        polesAttached: formData.polesAttached ? parseInt(formData.polesAttached) : null,
+        fiberLashedFootage: formData.fiberLashedFootage ? parseFloat(formData.fiberLashedFootage) : null,
+        fiberPulledFootage: formData.fiberPulledFootage ? parseFloat(formData.fiberPulledFootage) : null,
+        mstsInstalled: formData.mstsInstalled ? parseInt(formData.mstsInstalled) : null,
+        risersInstalled: formData.risersInstalled ? parseInt(formData.risersInstalled) : null,
+        spliceCases: formData.spliceCases ? parseInt(formData.spliceCases) : null,
+        guysPlaced: formData.guysPlaced ? parseInt(formData.guysPlaced) : null,
+        slackLoops: formData.slackLoops ? parseInt(formData.slackLoops) : null,
+        handholesPlaced: formData.handholesPlaced ? parseInt(formData.handholesPlaced) : null,
+        vaultsPlaced: formData.vaultsPlaced ? parseInt(formData.vaultsPlaced) : null,
+        drilledFootage: formData.drilledFootage ? parseFloat(formData.drilledFootage) : null,
+        plowedFootage: formData.plowedFootage ? parseFloat(formData.plowedFootage) : null,
+        notes: formData.notes || null,
+        issues: formData.issues || null,
       };
 
-      const response = await fetch("/api/reports/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const response = await fetch("/api/reports/field-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (response.ok) {
         setSuccess(true);
         setFormData({
@@ -879,7 +1217,7 @@ function SubmitReportTab() {
           location: "", workers: [], workerInput: "", hoursWorked: "",
           strandHungFootage: "", polesAttached: "", fiberLashedFootage: "", fiberPulledFootage: "",
           mstsInstalled: "", risersInstalled: "", spliceCases: "", guysPlaced: "", slackLoops: "",
-          handholesPlaced: "", vaultsPlaced: "", drilledFootage: "", plowedFootage: "", notes: "",
+          handholesPlaced: "", vaultsPlaced: "", drilledFootage: "", plowedFootage: "", notes: "", issues: "",
         });
       }
     } catch { /* ignore */ } finally { setSubmitting(false); }
@@ -992,7 +1330,15 @@ function SubmitReportTab() {
           {/* Notes */}
           <div className="space-y-2">
             <Label>Notes</Label>
-            <Textarea rows={3} placeholder="Any additional details, issues, or accomplishments..." value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} />
+            <Textarea rows={3} placeholder="Any additional details or accomplishments..." value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} />
+          </div>
+
+          {/* Issues */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" /> Issues / Blockers
+            </Label>
+            <Textarea rows={2} placeholder="Any problems, delays, or blockers encountered..." value={formData.issues} onChange={(e) => setFormData(prev => ({ ...prev, issues: e.target.value }))} />
           </div>
 
           <Button type="submit" className="w-full" disabled={submitting || !formData.location}>

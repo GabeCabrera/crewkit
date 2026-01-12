@@ -146,6 +146,14 @@ export async function GET(request: NextRequest) {
       orderBy: { date: "desc" },
       skip: (page - 1) * limit,
       take: limit,
+      include: {
+        team: {
+          select: { id: true, name: true },
+        },
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
+      },
     });
 
     return NextResponse.json({
@@ -191,6 +199,84 @@ export async function GET(request: NextRequest) {
     console.error("Error fetching field logs:", error);
     return NextResponse.json(
       { error: "Failed to fetch field logs" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/reports/field-logs - Create a new field work log
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true, teamId: true },
+    });
+
+    if (!user || user.role === "FIELD") {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    const body = await request.json();
+
+    // Parse date
+    const date = body.date ? new Date(body.date) : new Date();
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    const log = await prisma.fieldWorkLog.create({
+      data: {
+        date: dateOnly,
+        location: body.location || "",
+        workersNames: body.workersNames || [],
+        workerCount: body.workerCount || 0,
+        hoursWorked: body.hoursWorked || 0,
+        teamId: body.teamId || user.teamId,
+        createdById: session.user.id,
+        // Aerial metrics
+        strandHungFootage: body.strandHungFootage || null,
+        polesAttached: body.polesAttached || null,
+        fiberLashedFootage: body.fiberLashedFootage || null,
+        fiberPulledFootage: body.fiberPulledFootage || null,
+        // Underground metrics
+        drilledFootage: body.drilledFootage || null,
+        plowedFootage: body.plowedFootage || null,
+        trenchedFootage: body.trenchedFootage || null,
+        conduitPlacedFootage: body.conduitPlacedFootage || null,
+        conduitSize: body.conduitSize || null,
+        // Infrastructure
+        handholesPlaced: body.handholesPlaced || null,
+        vaultsPlaced: body.vaultsPlaced || null,
+        mstsInstalled: body.mstsInstalled || null,
+        guysPlaced: body.guysPlaced || null,
+        slackLoops: body.slackLoops || null,
+        risersInstalled: body.risersInstalled || null,
+        spliceCases: body.spliceCases || null,
+        anchorsPlaced: body.anchorsPlaced || null,
+        snowshoesPlaced: body.snowshoesPlaced || null,
+        // Notes
+        notes: body.notes || null,
+        issues: body.issues || null,
+        submittedBy: body.submittedBy || session.user.name || session.user.email || "Unknown",
+      },
+      include: {
+        team: {
+          select: { id: true, name: true },
+        },
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    return NextResponse.json(log);
+  } catch (error) {
+    console.error("Error creating field log:", error);
+    return NextResponse.json(
+      { error: "Failed to create field log" },
       { status: 500 }
     );
   }
