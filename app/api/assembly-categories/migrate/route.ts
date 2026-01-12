@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Create new categories
-    for (const catName of uniqueCategories) {
+    for (const catName of Array.from(uniqueCategories)) {
       const normalizedName = catName.toLowerCase();
       if (!categoryMap.has(normalizedName)) {
         if (!dryRun) {
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     if (createTypes) {
       // For each category, create common types
-      for (const [catName, catId] of categoryMap.entries()) {
+      for (const [catName, catId] of Array.from(categoryMap.entries())) {
         const resolvedCatId = dryRun ? `temp-${catName}` : catId;
         
         // Analyze assemblies in this category to determine types
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
           typeMap.set(resolvedCatId, new Map());
         }
 
-        for (const typeName of typesToCreate) {
+        for (const typeName of Array.from(typesToCreate)) {
           const normalizedType = typeName.toLowerCase();
           if (!typeMap.get(resolvedCatId)!.has(normalizedType)) {
             if (!dryRun) {
