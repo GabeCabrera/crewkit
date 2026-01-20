@@ -12,7 +12,10 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import type { MapLayer } from "./route-map-view";
-import { MeasurementTools, type MeasurementResult } from "./measurement-tools";
+import { MeasurementTools, type MeasurementResult, type SavedMeasurement } from "./measurement-tools";
+import { AddressSearch } from "./address-search";
+import { DrawingTools } from "./drawing-tools";
+import { NetworkDesign } from "./network-design";
 import "leaflet/dist/leaflet.css";
 
 // Fix for default marker icons in Leaflet with webpack
@@ -36,6 +39,14 @@ interface MapContentProps {
   canEdit: boolean;
   measurementMode?: boolean;
   onMeasurementComplete?: (result: MeasurementResult) => void;
+  savedMeasurement?: SavedMeasurement | null;
+  onSaveMeasurement?: (data: SavedMeasurement, updateTotalDistance: boolean) => Promise<void>;
+  drawingMode?: boolean;
+  onFeatureCreate?: (geoJson: GeoJSON.Feature) => void;
+  drawnFeatures?: GeoJSON.FeatureCollection;
+  // Network Design
+  jobId?: string;
+  networkDesignMode?: boolean;
 }
 
 // Component to handle map events
@@ -155,6 +166,13 @@ export default function MapContent({
   canEdit,
   measurementMode = false,
   onMeasurementComplete,
+  savedMeasurement,
+  onSaveMeasurement,
+  drawingMode = false,
+  onFeatureCreate,
+  drawnFeatures,
+  jobId,
+  networkDesignMode = false,
 }: MapContentProps) {
   return (
     <MapContainer
@@ -166,11 +184,37 @@ export default function MapContent({
       <MapEventHandler onMapMove={onMapMove} />
       <FitBoundsOnLayer layers={layers} />
       
+      {/* Address Search - positioned inside map for useMap() access */}
+      <div className="absolute top-3 left-12 z-[1000]">
+        <AddressSearch />
+      </div>
+      
       {/* Measurement Tools */}
       <MeasurementTools
         enabled={measurementMode}
         onMeasurementComplete={onMeasurementComplete}
+        savedMeasurement={savedMeasurement}
+        onSave={onSaveMeasurement}
+        canEdit={canEdit}
       />
+
+      {/* Drawing Tools */}
+      {onFeatureCreate && (
+        <DrawingTools
+          enabled={drawingMode}
+          onFeatureCreate={onFeatureCreate}
+          existingFeatures={drawnFeatures}
+        />
+      )}
+
+      {/* Network Design */}
+      {jobId && (
+        <NetworkDesign
+          jobId={jobId}
+          enabled={networkDesignMode}
+          canEdit={canEdit}
+        />
+      )}
 
       <LayersControl position="topleft">
         {/* Street Map (Default) */}

@@ -5,13 +5,11 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Briefcase } from "lucide-react";
 import { JobKanbanBoard } from "@/components/job-planner/job-kanban-board";
 import { JobDetailPanel } from "@/components/job-planner/job-detail-panel";
-import { JobCreationWizard } from "@/components/job-planner/job-creation-wizard";
 
 function JobsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [wizardOpen, setWizardOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Check for job query parameter
@@ -32,14 +30,26 @@ function JobsPageContent() {
     window.history.replaceState({}, "", "/manager/jobs");
   };
 
-  const handleCreateNew = () => {
-    setWizardOpen(true);
-  };
-
-  const handleJobCreated = (jobId: string) => {
-    // Refresh the kanban board and navigate to the new job
-    setRefreshKey((prev) => prev + 1);
-    router.push(`/manager/jobs/${jobId}`);
+  const handleCreateNew = async () => {
+    try {
+      const response = await fetch("/api/job-plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobName: "New Job",
+          startPoleId: "",
+          endPoleId: "",
+          totalDistance: 0,
+        }),
+      });
+      if (response.ok) {
+        const job = await response.json();
+        setRefreshKey((prev) => prev + 1);
+        router.push(`/manager/jobs/${job.id}`);
+      }
+    } catch (error) {
+      console.error("Error creating job:", error);
+    }
   };
 
   const handleJobUpdated = () => {
@@ -82,14 +92,6 @@ function JobsPageContent() {
           basePath="/manager/jobs"
         />
       )}
-
-      {/* Job Creation Wizard */}
-      <JobCreationWizard
-        open={wizardOpen}
-        onOpenChange={setWizardOpen}
-        onSuccess={handleJobCreated}
-        basePath="/manager/jobs"
-      />
     </div>
   );
 }

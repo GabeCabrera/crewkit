@@ -24,6 +24,8 @@ export async function GET(
         id: true,
         mapCenter: true,
         mapZoom: true,
+        measurementData: true,
+        totalDistance: true,
         mapLayers: {
           orderBy: { zIndex: "asc" },
         },
@@ -37,6 +39,8 @@ export async function GET(
     return NextResponse.json({
       center: jobPlan.mapCenter || { lat: 39.8283, lng: -98.5795 },
       zoom: jobPlan.mapZoom || 4,
+      measurementData: jobPlan.measurementData,
+      totalDistance: jobPlan.totalDistance,
       layers: jobPlan.mapLayers.map((layer) => ({
         id: layer.id,
         name: layer.name,
@@ -84,11 +88,13 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { center, zoom } = body;
+    const { center, zoom, measurementData, totalDistance } = body;
 
     const updateData: Record<string, unknown> = {};
     if (center) updateData.mapCenter = center;
     if (zoom !== undefined) updateData.mapZoom = zoom;
+    if (measurementData !== undefined) updateData.measurementData = measurementData;
+    if (totalDistance !== undefined) updateData.totalDistance = totalDistance;
 
     const jobPlan = await prisma.jobPlan.update({
       where: { id },
@@ -96,12 +102,16 @@ export async function PATCH(
       select: {
         mapCenter: true,
         mapZoom: true,
+        measurementData: true,
+        totalDistance: true,
       },
     });
 
     return NextResponse.json({
       center: jobPlan.mapCenter,
       zoom: jobPlan.mapZoom,
+      measurementData: jobPlan.measurementData,
+      totalDistance: jobPlan.totalDistance,
     });
   } catch (error) {
     console.error("Error updating map config:", error);
