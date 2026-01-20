@@ -12,7 +12,10 @@ import {
   CheckCircle2,
   Menu,
   X,
+  Pencil,
+  Check,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 // Planning Steps
@@ -105,6 +108,9 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
   const [currentStep, setCurrentStep] = useState("permits");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingUpdatesRef = useRef<Partial<JobPlanData>>({});
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -330,6 +336,40 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
     setMobileMenuOpen(false);
   };
 
+  // Handle name editing
+  const startEditingName = () => {
+    if (!canEdit || !job) return;
+    setEditedName(job.jobName);
+    setIsEditingName(true);
+    // Focus input after render
+    setTimeout(() => nameInputRef.current?.focus(), 0);
+  };
+
+  const saveNameEdit = () => {
+    if (!job || !editedName.trim()) {
+      setIsEditingName(false);
+      return;
+    }
+    if (editedName.trim() !== job.jobName) {
+      updateJob({ jobName: editedName.trim() });
+    }
+    setIsEditingName(false);
+  };
+
+  const cancelNameEdit = () => {
+    setIsEditingName(false);
+    setEditedName("");
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveNameEdit();
+    } else if (e.key === "Escape") {
+      cancelNameEdit();
+    }
+  };
+
   // Render current step content
   const renderStepContent = () => {
     if (!job) return null;
@@ -414,9 +454,42 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
-              <h1 className="font-semibold text-slate-900 truncate">
-                {job.jobName}
-              </h1>
+              {isEditingName ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    ref={nameInputRef}
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    onKeyDown={handleNameKeyDown}
+                    onBlur={saveNameEdit}
+                    className="h-8 text-base font-semibold"
+                    autoFocus
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={saveNameEdit}
+                  >
+                    <Check className="h-4 w-4 text-emerald-600" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    "group flex items-center gap-2",
+                    canEdit && "cursor-pointer"
+                  )}
+                  onClick={canEdit ? startEditingName : undefined}
+                >
+                  <h1 className="font-semibold text-slate-900 truncate">
+                    {job.jobName}
+                  </h1>
+                  {canEdit && (
+                    <Pencil className="h-3.5 w-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                  )}
+                </div>
+              )}
               <p className="text-xs text-slate-500">
                 {job.startPoleId} → {job.endPoleId}
               </p>
