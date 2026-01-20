@@ -21,6 +21,8 @@ import {
   FileCode,
   Pencil,
   Network,
+  Import,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MeasurementResult, SavedMeasurement } from "./measurement-tools";
@@ -105,6 +107,8 @@ export function RouteMapView({
   const [savedMeasurement, setSavedMeasurement] = useState<SavedMeasurement | null>(null);
   const [drawingMode, setDrawingMode] = useState(false);
   const [networkDesignMode, setNetworkDesignMode] = useState(false);
+  const [importingLayerId, setImportingLayerId] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const hasInitializedLayers = useRef(false);
@@ -290,6 +294,34 @@ export function RouteMapView({
       console.error("Error saving drawn feature:", error);
     }
   }, [jobId, mapConfig.layers, handleLayerUpdate, handleLayerAdd]);
+
+  // Import KMZ/KML points as network design nodes
+  const handleImportAsNodes = useCallback(async (layerId: string) => {
+    setImportingLayerId(layerId);
+    setImportSuccess(null);
+    try {
+      const response = await fetch(`/api/job-plans/${jobId}/design/import-from-layer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layerId }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setImportSuccess(`Imported ${data.imported} nodes`);
+        // Clear success message after 3 seconds
+        setTimeout(() => setImportSuccess(null), 3000);
+      } else {
+        const error = await response.json();
+        setUploadError(error.error || "Failed to import nodes");
+      }
+    } catch (error) {
+      console.error("Error importing nodes:", error);
+      setUploadError("Failed to import nodes from layer");
+    } finally {
+      setImportingLayerId(null);
+    }
+  }, [jobId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -680,6 +712,44 @@ export function RouteMapView({
                                   </Button>
                                 </div>
                               )}
+                            </div>
+                          )}
+
+                          {/* Import as Nodes for KMZ/KML layers */}
+                          {!isImageOverlay && layer.type !== "drawn" && canEdit && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={cn(
+                                  "h-8 text-xs w-full gap-1.5",
+                                  importSuccess === `Imported from ${layer.id}`
+                                    ? "border-green-300 bg-green-50 text-green-700"
+                                    : "border-violet-300 hover:bg-violet-50 text-violet-700"
+                                )}
+                                onClick={() => handleImportAsNodes(layer.id)}
+                                disabled={importingLayerId === layer.id}
+                              >
+                                {importingLayerId === layer.id ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    Importing...
+                                  </>
+                                ) : importSuccess && importSuccess.includes(layer.id) ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5" />
+                                    {importSuccess}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Import className="h-3.5 w-3.5" />
+                                    Import as Nodes
+                                  </>
+                                )}
+                              </Button>
+                              <p className="text-xs text-slate-400 mt-1.5">
+                                Convert point markers to network design nodes
+                              </p>
                             </div>
                           )}
                         </div>
