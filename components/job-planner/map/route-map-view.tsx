@@ -20,12 +20,9 @@ import {
   AlertCircle,
   FileCode,
   Pencil,
-  Network,
-  Import,
-  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MeasurementResult, SavedMeasurement } from "./measurement-tools";
+import type { MeasurementResult } from "./measurement-tools";
 
 // Types for map data
 export interface MapLayer {
@@ -104,83 +101,18 @@ export function RouteMapView({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  const [savedMeasurement, setSavedMeasurement] = useState<SavedMeasurement | null>(null);
-  const [drawingMode, setDrawingMode] = useState(false);
-  const [networkDesignMode, setNetworkDesignMode] = useState(false);
-  const [importingLayerId, setImportingLayerId] = useState<string | null>(null);
-  const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const hasInitializedLayers = useRef(false);
 
   // Get the selected layer for editing
   const selectedLayer = selectedLayerId
     ? mapConfig.layers.find((l) => l.id === selectedLayerId)
     : null;
 
-  // Sync layers from initialConfig only on initial load (not on subsequent changes)
-  // This prevents race conditions when toggling layer visibility
-  useEffect(() => {
-    if (!hasInitializedLayers.current && initialConfig?.layers && initialConfig.layers.length > 0) {
-      hasInitializedLayers.current = true;
-      const layers = initialConfig.layers;
-      setMapConfig(prev => ({
-        ...prev,
-        center: initialConfig.center || prev.center,
-        zoom: initialConfig.zoom || prev.zoom,
-        layers,
-      }));
-    }
-  }, [initialConfig]);
-
   // Handle measurement completion
   const handleMeasurementComplete = useCallback((result: MeasurementResult) => {
     setLastMeasurement(result);
   }, []);
-
-  // Load saved measurement from API
-  useEffect(() => {
-    const loadSavedMeasurement = async () => {
-      try {
-        const response = await fetch(`/api/job-plans/${jobId}/map`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.measurementData) {
-            setSavedMeasurement(data.measurementData as SavedMeasurement);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading saved measurement:", error);
-      }
-    };
-
-    if (jobId) {
-      loadSavedMeasurement();
-    }
-  }, [jobId]);
-
-  // Save measurement to API
-  const handleSaveMeasurement = useCallback(async (data: SavedMeasurement, updateTotalDistance: boolean) => {
-    const body: Record<string, unknown> = {
-      measurementData: data,
-    };
-
-    if (updateTotalDistance) {
-      body.totalDistance = data.result.totalCableRequired;
-    }
-
-    const response = await fetch(`/api/job-plans/${jobId}/map`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to save measurement");
-    }
-
-    setSavedMeasurement(data);
-  }, [jobId]);
 
   // Sync config changes to parent
   useEffect(() => {
@@ -249,79 +181,6 @@ export function RouteMapView({
       console.error("Error deleting layer:", error);
     }
   }, [jobId, selectedLayerId]);
-
-  // Handle drawn feature creation
-  const handleFeatureCreate = useCallback(async (feature: GeoJSON.Feature) => {
-    try {
-      // Find existing drawn layer or create new one
-      const existingDrawnLayer = mapConfig.layers.find(l => l.type === "drawn");
-      
-      if (existingDrawnLayer) {
-        // Add feature to existing layer
-        const existingGeoJson = existingDrawnLayer.geoJson as GeoJSON.FeatureCollection;
-        const updatedGeoJson: GeoJSON.FeatureCollection = {
-          type: "FeatureCollection",
-          features: [...(existingGeoJson?.features || []), feature],
-        };
-
-        // Update locally and sync to server
-        handleLayerUpdate(existingDrawnLayer.id, {
-          geoJson: updatedGeoJson as GeoJSON.GeoJsonObject,
-        });
-      } else {
-        // Create new drawn layer via API
-        const response = await fetch(`/api/job-plans/${jobId}/map/layers`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: "Drawn Features",
-            type: "drawn",
-            geoJson: {
-              type: "FeatureCollection",
-              features: [feature],
-            },
-            opacity: 1.0,
-            visible: true,
-          }),
-        });
-
-        if (response.ok) {
-          const newLayer = await response.json();
-          handleLayerAdd(newLayer);
-        }
-      }
-    } catch (error) {
-      console.error("Error saving drawn feature:", error);
-    }
-  }, [jobId, mapConfig.layers, handleLayerUpdate, handleLayerAdd]);
-
-  // Import KMZ/KML points as network design nodes
-  const handleImportAsNodes = useCallback(async (layerId: string) => {
-    setImportingLayerId(layerId);
-    setImportSuccess(null);
-    try {
-      const response = await fetch(`/api/job-plans/${jobId}/design/import-from-layer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ layerId }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setImportSuccess(`Imported ${data.imported} nodes`);
-        // Clear success message after 3 seconds
-        setTimeout(() => setImportSuccess(null), 3000);
-      } else {
-        const error = await response.json();
-        setUploadError(error.error || "Failed to import nodes");
-      }
-    } catch (error) {
-      console.error("Error importing nodes:", error);
-      setUploadError("Failed to import nodes from layer");
-    } finally {
-      setImportingLayerId(null);
-    }
-  }, [jobId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -478,10 +337,7 @@ export function RouteMapView({
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => {
-            setMeasurementMode(!measurementMode);
-            if (!measurementMode) setDrawingMode(false);
-          }}
+          onClick={() => setMeasurementMode(!measurementMode)}
           className={cn(
             "h-8 bg-white/95 backdrop-blur-sm shadow-md hover:bg-white",
             measurementMode && "bg-blue-100 text-blue-700 hover:bg-blue-100"
@@ -490,50 +346,6 @@ export function RouteMapView({
         >
           <Ruler className="h-4 w-4" />
         </Button>
-
-        {/* Drawing Tool Toggle */}
-        {canEdit && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setDrawingMode(!drawingMode);
-              if (!drawingMode) {
-                setMeasurementMode(false);
-                setNetworkDesignMode(false);
-              }
-            }}
-            className={cn(
-              "h-8 bg-white/95 backdrop-blur-sm shadow-md hover:bg-white",
-              drawingMode && "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-            )}
-            title="Draw Features"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-        )}
-
-        {/* Network Design Toggle */}
-        {canEdit && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setNetworkDesignMode(!networkDesignMode);
-              if (!networkDesignMode) {
-                setMeasurementMode(false);
-                setDrawingMode(false);
-              }
-            }}
-            className={cn(
-              "h-8 bg-white/95 backdrop-blur-sm shadow-md hover:bg-white",
-              networkDesignMode && "bg-violet-100 text-violet-700 hover:bg-violet-100"
-            )}
-            title="Network Design"
-          >
-            <Network className="h-4 w-4" />
-          </Button>
-        )}
 
         {/* Layer Panel Toggle */}
         <Button
@@ -714,44 +526,6 @@ export function RouteMapView({
                               )}
                             </div>
                           )}
-
-                          {/* Import as Nodes for KMZ/KML layers */}
-                          {!isImageOverlay && layer.type !== "drawn" && canEdit && (
-                            <div className="pt-2 border-t border-slate-100">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className={cn(
-                                  "h-8 text-xs w-full gap-1.5",
-                                  importSuccess === `Imported from ${layer.id}`
-                                    ? "border-green-300 bg-green-50 text-green-700"
-                                    : "border-violet-300 hover:bg-violet-50 text-violet-700"
-                                )}
-                                onClick={() => handleImportAsNodes(layer.id)}
-                                disabled={importingLayerId === layer.id}
-                              >
-                                {importingLayerId === layer.id ? (
-                                  <>
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    Importing...
-                                  </>
-                                ) : importSuccess && importSuccess.includes(layer.id) ? (
-                                  <>
-                                    <Check className="h-3.5 w-3.5" />
-                                    {importSuccess}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Import className="h-3.5 w-3.5" />
-                                    Import as Nodes
-                                  </>
-                                )}
-                              </Button>
-                              <p className="text-xs text-slate-400 mt-1.5">
-                                Convert point markers to network design nodes
-                              </p>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -773,13 +547,6 @@ export function RouteMapView({
         canEdit={canEdit}
         measurementMode={measurementMode}
         onMeasurementComplete={handleMeasurementComplete}
-        savedMeasurement={savedMeasurement}
-        onSaveMeasurement={handleSaveMeasurement}
-        drawingMode={drawingMode}
-        onFeatureCreate={handleFeatureCreate}
-        drawnFeatures={mapConfig.layers.find(l => l.type === "drawn")?.geoJson as GeoJSON.FeatureCollection | undefined}
-        jobId={jobId}
-        networkDesignMode={networkDesignMode}
       />
     </div>
   );

@@ -15,9 +15,6 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
-  Save,
-  Loader2,
-  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -53,19 +50,9 @@ export interface SpanMeasurement {
   withSag: number;
 }
 
-export interface SavedMeasurement {
-  points: Array<{ lat: number; lng: number; isSlackLoop: boolean; isSplicePoint: boolean }>;
-  settings: { sagPercentage: number; slackLoopFeet: number; spliceSlackFeet: number };
-  result: MeasurementResult;
-  savedAt: string;
-}
-
 interface MeasurementToolsProps {
   enabled: boolean;
   onMeasurementComplete?: (result: MeasurementResult) => void;
-  savedMeasurement?: SavedMeasurement | null;
-  onSave?: (data: SavedMeasurement, updateTotalDistance: boolean) => Promise<void>;
-  canEdit?: boolean;
 }
 
 // Calculate distance between two points using Haversine formula
@@ -151,51 +138,17 @@ function MapClickHandler({
 export function MeasurementTools({
   enabled,
   onMeasurementComplete,
-  savedMeasurement,
-  onSave,
-  canEdit = true,
 }: MeasurementToolsProps) {
   const map = useMap();
   const [points, setPoints] = useState<MeasurementPoint[]>([]);
   const [isPlacing, setIsPlacing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [result, setResult] = useState<MeasurementResult | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [updateTotalDistance, setUpdateTotalDistance] = useState(true);
-  const hasLoadedSaved = useRef(false);
 
   // Calculation parameters
   const [sagPercentage, setSagPercentage] = useState(DEFAULT_SAG_PERCENTAGE);
   const [slackLoopFeet, setSlackLoopFeet] = useState(DEFAULT_SLACK_LOOP_FEET);
   const [spliceSlackFeet, setSpliceSlackFeet] = useState(DEFAULT_SPLICE_SLACK_FEET);
-
-  // Load saved measurement on mount
-  useEffect(() => {
-    if (savedMeasurement && !hasLoadedSaved.current && enabled) {
-      hasLoadedSaved.current = true;
-      
-      // Restore points
-      const restoredPoints: MeasurementPoint[] = savedMeasurement.points.map((p, i) => ({
-        id: `point-restored-${i}`,
-        latlng: L.latLng(p.lat, p.lng),
-        isSlackLoop: p.isSlackLoop,
-        isSplicePoint: p.isSplicePoint,
-      }));
-      setPoints(restoredPoints);
-      
-      // Restore settings
-      setSagPercentage(savedMeasurement.settings.sagPercentage);
-      setSlackLoopFeet(savedMeasurement.settings.slackLoopFeet);
-      setSpliceSlackFeet(savedMeasurement.settings.spliceSlackFeet);
-      
-      // Fit map to measurement if we have points
-      if (restoredPoints.length > 0) {
-        const bounds = L.latLngBounds(restoredPoints.map(p => p.latlng));
-        map.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }
-  }, [savedMeasurement, enabled, map]);
 
   // Reset state when measurement mode is disabled
   useEffect(() => {
@@ -203,14 +156,6 @@ export function MeasurementTools({
       setIsPlacing(false);
     }
   }, [enabled]);
-
-  // Clear save success after 3 seconds
-  useEffect(() => {
-    if (saveSuccess) {
-      const timer = setTimeout(() => setSaveSuccess(false), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [saveSuccess]);
 
   // Calculate measurements whenever points or parameters change
   useEffect(() => {
@@ -292,42 +237,11 @@ export function MeasurementTools({
   const clearAll = useCallback(() => {
     setPoints([]);
     setResult(null);
-    hasLoadedSaved.current = false;
   }, []);
 
   const undoLastPoint = useCallback(() => {
     setPoints((prev) => prev.slice(0, -1));
   }, []);
-
-  const handleSave = useCallback(async () => {
-    if (!result || !onSave) return;
-
-    setIsSaving(true);
-    try {
-      const measurementData: SavedMeasurement = {
-        points: points.map((p) => ({
-          lat: p.latlng.lat,
-          lng: p.latlng.lng,
-          isSlackLoop: p.isSlackLoop,
-          isSplicePoint: p.isSplicePoint,
-        })),
-        settings: {
-          sagPercentage,
-          slackLoopFeet,
-          spliceSlackFeet,
-        },
-        result,
-        savedAt: new Date().toISOString(),
-      };
-
-      await onSave(measurementData, updateTotalDistance);
-      setSaveSuccess(true);
-    } catch (error) {
-      console.error("Error saving measurement:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [result, onSave, points, sagPercentage, slackLoopFeet, spliceSlackFeet, updateTotalDistance]);
 
   if (!enabled) return null;
 
@@ -498,46 +412,6 @@ export function MeasurementTools({
                 </div>
               </div>
             </div>
-
-            {/* Save to Job */}
-            {onSave && canEdit && (
-              <div className="space-y-2 pt-1">
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <Checkbox
-                    checked={updateTotalDistance}
-                    onCheckedChange={(checked) => setUpdateTotalDistance(checked === true)}
-                  />
-                  <span className="text-slate-600">Update job&apos;s total distance</span>
-                </label>
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className={cn(
-                    "w-full h-9",
-                    saveSuccess
-                      ? "bg-emerald-500 hover:bg-emerald-600"
-                      : "bg-orange-500 hover:bg-orange-600"
-                  )}
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : saveSuccess ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2" />
-                      Saved!
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save to Job
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
 
             {/* Span Details */}
             {result.spans.length > 0 && (

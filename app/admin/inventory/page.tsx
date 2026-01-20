@@ -10,7 +10,6 @@ import {
   Search, 
   Command,
   FolderTree,
-  ClipboardList,
 } from "lucide-react";
 import { TablePageSkeleton, PageContent } from "@/components/layout/page-skeleton";
 import { StatsCards } from "@/components/inventory/stats-cards";
@@ -18,7 +17,6 @@ import { EquipmentTable } from "@/components/inventory/equipment-table";
 import { AssembliesTable } from "@/components/inventory/assemblies-table";
 import { GlobalSearch } from "@/components/inventory/global-search";
 import { CategoryTypeManager } from "@/components/inventory/category-type-manager";
-import { AllocationView } from "@/components/inventory/allocation-view";
 import { matchesWithSynonyms } from "@/lib/equipment-synonyms";
 
 export interface Equipment {
@@ -398,7 +396,7 @@ export default function InventoryPage() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
             <TabsTrigger value="equipment" className="gap-2">
               <Package className="h-4 w-4" />
               <span className="hidden sm:inline">Equipment</span>
@@ -413,11 +411,6 @@ export default function InventoryPage() {
               <FolderTree className="h-4 w-4" />
               <span className="hidden sm:inline">Categories</span>
               <span className="sm:hidden">Cats</span>
-            </TabsTrigger>
-            <TabsTrigger value="allocations" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Allocations</span>
-              <span className="sm:hidden">Alloc</span>
             </TabsTrigger>
           </TabsList>
 
@@ -457,11 +450,6 @@ export default function InventoryPage() {
           {/* Categories & Types Tab */}
           <TabsContent value="categories" className="space-y-4">
             <CategoryTypeManager />
-          </TabsContent>
-
-          {/* Allocations Tab */}
-          <TabsContent value="allocations" className="space-y-4">
-            <AllocationView />
           </TabsContent>
         </Tabs>
 

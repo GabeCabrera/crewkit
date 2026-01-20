@@ -100,34 +100,12 @@ async function main() {
     createdPermitTypes.push(created.name);
   }
 
-  // Create default node types for network design
-  const defaultNodeTypes = [
-    { name: "Pole", icon: "Waypoints", color: "#8B4513", order: 1 },
-    { name: "Splice Enclosure", icon: "Cable", color: "#DC2626", order: 2 },
-    { name: "Hand Hole", icon: "Square", color: "#059669", order: 3 },
-    { name: "Pedestal", icon: "Cylinder", color: "#7C3AED", order: 4 },
-    { name: "Terminal", icon: "Radio", color: "#2563EB", order: 5 },
-    { name: "Anchor", icon: "Anchor", color: "#71717A", order: 6 },
-    { name: "MST", icon: "GitBranch", color: "#F59E0B", order: 7 },
-  ];
-
-  const createdNodeTypes = [];
-  for (const nodeType of defaultNodeTypes) {
-    const created = await prisma.nodeType.upsert({
-      where: { name: nodeType.name },
-      update: { icon: nodeType.icon, color: nodeType.color, order: nodeType.order },
-      create: nodeType,
-    });
-    createdNodeTypes.push(created.name);
-  }
-
   console.log('Seed data created:');
   console.log('- Admin:', admin.email);
   console.log('- Manager:', manager.email);
   console.log('- Field:', field.email);
   console.log('- Equipment:', equipment1.name, equipment2.name);
   console.log('- Permit Types:', createdPermitTypes.join(', '));
-  console.log('- Node Types:', createdNodeTypes.join(', '));
 }
 
 main()

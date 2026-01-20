@@ -90,7 +90,6 @@ model Equipment {
   inventory     Inventory?
   assemblyItems AssemblyItem[]
   equipmentLogs EquipmentLog[]
-  materialAllocations JobMaterialAllocation[]
 }
 
 model Inventory {
@@ -124,7 +123,6 @@ model AssemblyType {
   updatedAt   DateTime @updatedAt
   
   assemblies  Assembly[]
-  nodeTypes   NodeType[]
   
   @@unique([name, categoryId])
 }
@@ -395,13 +393,6 @@ model JobPlan {
   mapCenter           Json?     // { lat: number, lng: number }
   mapZoom             Int?      // Default zoom level
   mapLayers           JobMapLayer[]
-  measurementData     Json?     // Saved measurement points, settings, and results
-  
-  // ========== NETWORK DESIGN ==========
-  mapNodes            MapNode[]
-  mapRoutes           MapRoute[]
-  materialAllocations JobMaterialAllocation[]
-  totalStrandFootage  Float?    // Aggregate strand footage (not inventory-linked)
   
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -609,80 +600,4 @@ model PermitDocument {
   uploadedAt   DateTime  @default(now())
   
   @@index([jobPermitId])
-}
-
-// ============================================================
-// NETWORK DESIGN SYSTEM
-// ============================================================
-
-// Pre-populated node types for the design palette
-model NodeType {
-  id              String   @id @default(cuid())
-  name            String   @unique  // "Pole", "Splice Enclosure", "Hand Hole", etc.
-  icon            String?           // Lucide icon name for UI
-  color           String?           // Hex color for map display
-  assemblyTypeId  String?
-  assemblyType    AssemblyType? @relation(fields: [assemblyTypeId], references: [id])
-  isActive        Boolean  @default(true)
-  order           Int      @default(0)
-  createdAt       DateTime @default(now())
-  
-  nodes           MapNode[]
-}
-
-// Node placed on the map
-model MapNode {
-  id            String   @id @default(cuid())
-  jobPlanId     String
-  jobPlan       JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
-  nodeTypeId    String
-  nodeType      NodeType @relation(fields: [nodeTypeId], references: [id])
-  name          String?           // Optional custom name
-  lat           Float
-  lng           Float
-  properties    Json?             // Additional properties
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  routesFrom    MapRoute[] @relation("RouteFrom")
-  routesTo      MapRoute[] @relation("RouteTo")
-  
-  @@index([jobPlanId])
-}
-
-// Route connecting two nodes (click-to-connect)
-model MapRoute {
-  id            String   @id @default(cuid())
-  jobPlanId     String
-  jobPlan       JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
-  fromNodeId    String
-  fromNode      MapNode  @relation("RouteFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
-  toNodeId      String
-  toNode        MapNode  @relation("RouteTo", fields: [toNodeId], references: [id], onDelete: Cascade)
-  routeType     String   // "strand_only" | "fiber" | "mst"
-  fiberCount    Int?     // 12, 24, 48, 96, 144, 288 (for fiber/mst routes)
-  footage       Float    // Calculated with sag/slack or manual override
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@index([jobPlanId])
-}
-
-// Aggregated material requirements per job
-model JobMaterialAllocation {
-  id            String   @id @default(cuid())
-  jobPlanId     String
-  jobPlan       JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
-  equipmentId   String
-  equipment     Equipment @relation(fields: [equipmentId], references: [id])
-  quantity      Float
-  unit          String   // "ft", "each", etc.
-  source        String   // "node", "route", "manual"
-  sourceDetails Json?    // Which nodes/routes contributed
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@unique([jobPlanId, equipmentId])
-  @@index([jobPlanId])
-  @@index([equipmentId])
 }
