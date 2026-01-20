@@ -466,8 +466,8 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      {/* Header - offset on desktop to not overlap job phase sidebar */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 lg:ml-72">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Button
