@@ -293,6 +293,13 @@ enum JobPlanStatus {
   CANCELLED
 }
 
+enum JobPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 model JobPlan {
   id                  String   @id @default(cuid())
   
@@ -364,6 +371,7 @@ model JobPlan {
   // ========== STATUS & METADATA ==========
   
   status              JobPlanStatus @default(DRAFT)
+  priority            JobPriority   @default(MEDIUM)
   
   // Relationships
   createdById         String

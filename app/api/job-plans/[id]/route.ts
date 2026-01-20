@@ -148,8 +148,8 @@ export async function PATCH(
       "plannedStartDate", "plannedEndDate", "estimatedDuration", "durationUnit",
       // Reporting
       "foremanSignoff", "signoffDate", "lessonsLearned", "completedAt",
-      // Status (manual override)
-      "status"
+      // Status and Priority
+      "status", "priority"
     ];
 
     for (const field of allowedFields) {

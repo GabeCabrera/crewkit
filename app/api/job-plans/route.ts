@@ -150,6 +150,8 @@ export async function POST(request: NextRequest) {
         foremanNotes: body.foremanNotes ?? null,
         // Status - default to DRAFT for new jobs created via quick-create flow
         status: body.status ?? "DRAFT",
+        // Priority - default to MEDIUM
+        priority: body.priority ?? "MEDIUM",
         // Creator
         createdById: session.user.id,
       },

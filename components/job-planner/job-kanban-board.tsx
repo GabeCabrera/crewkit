@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import {
   MapPin,
@@ -16,8 +16,18 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
+  Search,
+  X,
+  Filter,
+  Pencil,
+  Trash2,
+  Copy,
+  Calendar,
+  Flag,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,9 +35,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 type JobPlanStatus = "DRAFT" | "READY" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+type JobPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 interface Assignment {
   id: string;
@@ -44,7 +65,10 @@ interface JobPlan {
   startPoleId: string;
   endPoleId: string;
   totalDistance: number;
+  actualFootage: number;
   status: JobPlanStatus;
+  priority: JobPriority;
+  plannedEndDate: string | null;
   trafficControl: boolean;
   treeTrimming: boolean;
   animalHazards: boolean;
@@ -66,15 +90,23 @@ interface Column {
   title: string;
   icon: React.ReactNode;
   color: string;
+  bgColor: string;
 }
 
 const columns: Column[] = [
-  { id: "DRAFT", title: "Draft", icon: <FileText className="h-4 w-4" />, color: "bg-slate-100 border-slate-300" },
-  { id: "READY", title: "Ready", icon: <CheckCircle2 className="h-4 w-4" />, color: "bg-emerald-50 border-emerald-300" },
-  { id: "IN_PROGRESS", title: "In Progress", icon: <Clock className="h-4 w-4" />, color: "bg-blue-50 border-blue-300" },
-  { id: "COMPLETED", title: "Completed", icon: <CheckCircle2 className="h-4 w-4" />, color: "bg-green-50 border-green-300" },
-  { id: "CANCELLED", title: "Cancelled", icon: <XCircle className="h-4 w-4" />, color: "bg-red-50 border-red-300" },
+  { id: "DRAFT", title: "Draft", icon: <FileText className="h-4 w-4" />, color: "bg-slate-100 border-slate-300", bgColor: "bg-slate-50" },
+  { id: "READY", title: "Ready", icon: <CheckCircle2 className="h-4 w-4" />, color: "bg-emerald-50 border-emerald-300", bgColor: "bg-emerald-25" },
+  { id: "IN_PROGRESS", title: "In Progress", icon: <Clock className="h-4 w-4" />, color: "bg-blue-50 border-blue-300", bgColor: "bg-blue-25" },
+  { id: "COMPLETED", title: "Completed", icon: <CheckCircle2 className="h-4 w-4" />, color: "bg-green-50 border-green-300", bgColor: "bg-green-25" },
+  { id: "CANCELLED", title: "Cancelled", icon: <XCircle className="h-4 w-4" />, color: "bg-red-50 border-red-300", bgColor: "bg-red-25" },
 ];
+
+const priorityConfig: Record<JobPriority, { border: string; badge: string; label: string }> = {
+  URGENT: { border: "border-l-4 border-l-red-500", badge: "bg-red-100 text-red-700", label: "Urgent" },
+  HIGH: { border: "border-l-4 border-l-orange-500", badge: "bg-orange-100 text-orange-700", label: "High" },
+  MEDIUM: { border: "border-l-4 border-l-blue-400", badge: "", label: "Medium" },
+  LOW: { border: "border-l-4 border-l-slate-300", badge: "bg-slate-100 text-slate-600", label: "Low" },
+};
 
 interface JobKanbanBoardProps {
   onCreateNew?: () => void;
@@ -86,15 +118,68 @@ interface JobKanbanBoardProps {
 // Mobile detection hook
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
-
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < breakpoint);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, [breakpoint]);
-
   return isMobile;
+}
+
+// localStorage hook for collapsed columns
+function useCollapsedColumns() {
+  const [collapsed, setCollapsed] = useState<Record<JobPlanStatus, boolean>>({
+    DRAFT: false,
+    READY: false,
+    IN_PROGRESS: false,
+    COMPLETED: true,
+    CANCELLED: true,
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("kanban-collapsed-columns");
+    if (saved) {
+      try {
+        setCollapsed(JSON.parse(saved));
+      } catch {
+        // ignore parse errors
+      }
+    }
+  }, []);
+
+  const toggleColumn = (status: JobPlanStatus) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [status]: !prev[status] };
+      localStorage.setItem("kanban-collapsed-columns", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  return { collapsed, toggleColumn };
+}
+
+// Due date helper
+function getDueDateStatus(dateStr: string | null): { label: string; className: string } | null {
+  if (!dateStr) return null;
+  
+  const dueDate = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+  
+  const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) {
+    return { label: "Overdue", className: "bg-red-100 text-red-700" };
+  } else if (diffDays === 0) {
+    return { label: "Due Today", className: "bg-orange-100 text-orange-700" };
+  } else if (diffDays <= 3) {
+    return { label: `Due in ${diffDays}d`, className: "bg-amber-100 text-amber-700" };
+  } else {
+    const formatted = dueDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return { label: formatted, className: "bg-slate-100 text-slate-600" };
+  }
 }
 
 export function JobKanbanBoard({
@@ -110,7 +195,19 @@ export function JobKanbanBoard({
   const [dragOverColumn, setDragOverColumn] = useState<JobPlanStatus | null>(null);
   const isMobile = useIsMobile();
 
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState<JobPriority | "ALL">("ALL");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("ALL");
+  const [hazardsFilter, setHazardsFilter] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<JobPlan | null>(null);
+
   const canEdit = !viewOnly && !!session?.user?.role && ["MANAGER", "ADMIN", "SUPERUSER"].includes(session.user.role);
+  const canDelete = !viewOnly && !!session?.user?.role && ["ADMIN", "SUPERUSER"].includes(session.user.role);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -130,24 +227,122 @@ export function JobKanbanBoard({
     fetchJobs();
   }, [fetchJobs]);
 
+  // Get unique assignees for filter dropdown
+  const uniqueAssignees = Array.from(
+    new Map(
+      jobs.flatMap((j) => j.assignments.map((a) => [a.user.id, a.user]))
+    ).values()
+  );
+
+  // Filter jobs
+  const filteredJobs = jobs.filter((job) => {
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (
+        !job.jobName.toLowerCase().includes(query) &&
+        !job.startPoleId.toLowerCase().includes(query) &&
+        !job.endPoleId.toLowerCase().includes(query)
+      ) {
+        return false;
+      }
+    }
+    // Priority filter
+    if (priorityFilter !== "ALL" && job.priority !== priorityFilter) {
+      return false;
+    }
+    // Assignee filter
+    if (assigneeFilter !== "ALL" && !job.assignments.some((a) => a.user.id === assigneeFilter)) {
+      return false;
+    }
+    // Hazards filter
+    if (hazardsFilter && !hasHazards(job)) {
+      return false;
+    }
+    return true;
+  });
+
+  const hasActiveFilters = searchQuery || priorityFilter !== "ALL" || assigneeFilter !== "ALL" || hazardsFilter;
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setPriorityFilter("ALL");
+    setAssigneeFilter("ALL");
+    setHazardsFilter(false);
+  };
+
   const updateJobStatus = async (jobId: string, newStatus: JobPlanStatus) => {
+    // Optimistic update
+    setJobs((prev) =>
+      prev.map((job) =>
+        job.id === jobId ? { ...job, status: newStatus } : job
+      )
+    );
     try {
       const response = await fetch(`/api/job-plans/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-
-      if (response.ok) {
-        setJobs((prev) =>
-          prev.map((job) =>
-            job.id === jobId ? { ...job, status: newStatus } : job
-          )
-        );
+      if (!response.ok) {
+        // Revert on error
+        fetchJobs();
       }
     } catch (error) {
       console.error("Error updating job status:", error);
+      fetchJobs();
     }
+  };
+
+  const updateJobName = async (jobId: string, newName: string) => {
+    // Optimistic update
+    setJobs((prev) =>
+      prev.map((job) =>
+        job.id === jobId ? { ...job, jobName: newName } : job
+      )
+    );
+    try {
+      const response = await fetch(`/api/job-plans/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobName: newName }),
+      });
+      if (!response.ok) {
+        fetchJobs();
+      }
+    } catch (error) {
+      console.error("Error updating job name:", error);
+      fetchJobs();
+    }
+  };
+
+  const duplicateJob = async (job: JobPlan) => {
+    try {
+      const response = await fetch(`/api/job-plans/${job.id}/duplicate`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        const newJob = await response.json();
+        setJobs((prev) => [newJob, ...prev]);
+      }
+    } catch (error) {
+      console.error("Error duplicating job:", error);
+    }
+  };
+
+  const deleteJob = async (job: JobPlan) => {
+    try {
+      const response = await fetch(`/api/job-plans/${job.id}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        setJobs((prev) => prev.filter((j) => j.id !== job.id));
+      }
+    } catch (error) {
+      console.error("Error deleting job:", error);
+    }
+    setDeleteDialogOpen(false);
+    setJobToDelete(null);
   };
 
   const handleDragStart = (e: React.DragEvent, job: JobPlan) => {
@@ -155,6 +350,10 @@ export function JobKanbanBoard({
     setDraggedJob(job);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", job.id);
+    // Add scale effect
+    const target = e.currentTarget as HTMLElement;
+    target.style.transform = "scale(1.02)";
+    target.style.opacity = "0.8";
   };
 
   const handleDragOver = (e: React.DragEvent, columnId: JobPlanStatus) => {
@@ -170,22 +369,23 @@ export function JobKanbanBoard({
   const handleDrop = (e: React.DragEvent, columnId: JobPlanStatus) => {
     e.preventDefault();
     if (!canEdit || !draggedJob) return;
-
     if (draggedJob.status !== columnId) {
       updateJobStatus(draggedJob.id, columnId);
     }
-
     setDraggedJob(null);
     setDragOverColumn(null);
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (e: React.DragEvent) => {
+    const target = e.currentTarget as HTMLElement;
+    target.style.transform = "";
+    target.style.opacity = "";
     setDraggedJob(null);
     setDragOverColumn(null);
   };
 
   const getJobsByStatus = (status: JobPlanStatus) => {
-    return jobs.filter((job) => job.status === status);
+    return filteredJobs.filter((job) => job.status === status);
   };
 
   const hasHazards = (job: JobPlan) => {
@@ -203,29 +403,114 @@ export function JobKanbanBoard({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-slate-900">Job Board</h2>
-          <span className="text-sm text-slate-500">({jobs.length} jobs)</span>
+          <span className="text-sm text-slate-500">
+            ({filteredJobs.length}{hasActiveFilters ? ` of ${jobs.length}` : ""} jobs)
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchJobs} className="h-10 px-3">
-            <RefreshCw className="h-4 w-4 sm:mr-1" />
-            <span className="hidden sm:inline">Refresh</span>
+          <Button variant="outline" size="sm" onClick={fetchJobs} className="h-9">
+            <RefreshCw className="h-4 w-4" />
           </Button>
           {onCreateNew && !viewOnly && (
-            <Button size="sm" onClick={onCreateNew} className="h-10 px-3 bg-orange-500 hover:bg-orange-600">
-              <Plus className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">New Job</span>
+            <Button size="sm" onClick={onCreateNew} className="h-9 bg-orange-500 hover:bg-orange-600">
+              <Plus className="h-4 w-4 mr-1" />
+              New Job
             </Button>
           )}
         </div>
       </div>
 
+      {/* Search and Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Search jobs, poles..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-10"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowFilters(!showFilters)}
+          className={cn("h-10 gap-2", showFilters && "bg-slate-100")}
+        >
+          <Filter className="h-4 w-4" />
+          Filters
+          {hasActiveFilters && (
+            <span className="h-5 w-5 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">
+              {[priorityFilter !== "ALL", assigneeFilter !== "ALL", hazardsFilter].filter(Boolean).length}
+            </span>
+          )}
+        </Button>
+      </div>
+
+      {/* Filter Row */}
+      {showFilters && (
+        <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg border">
+          <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as JobPriority | "ALL")}>
+            <SelectTrigger className="w-32 h-9 bg-white">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Priorities</SelectItem>
+              <SelectItem value="URGENT">Urgent</SelectItem>
+              <SelectItem value="HIGH">High</SelectItem>
+              <SelectItem value="MEDIUM">Medium</SelectItem>
+              <SelectItem value="LOW">Low</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+            <SelectTrigger className="w-40 h-9 bg-white">
+              <SelectValue placeholder="Assignee" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Assignees</SelectItem>
+              {uniqueAssignees.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.name || user.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant={hazardsFilter ? "default" : "outline"}
+            size="sm"
+            onClick={() => setHazardsFilter(!hazardsFilter)}
+            className={cn("h-9 gap-1", hazardsFilter && "bg-amber-500 hover:bg-amber-600")}
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Hazards
+          </Button>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 text-slate-500">
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Conditional View: Mobile List or Desktop Kanban */}
       {isMobile ? (
         <MobileListView
-          jobs={jobs}
+          jobs={filteredJobs}
           columns={columns}
           onSelectJob={onSelectJob}
           onStatusChange={updateJobStatus}
@@ -238,8 +523,15 @@ export function JobKanbanBoard({
           columns={columns}
           getJobsByStatus={getJobsByStatus}
           onSelectJob={onSelectJob}
+          onUpdateName={updateJobName}
+          onDuplicate={duplicateJob}
+          onDelete={(job) => {
+            setJobToDelete(job);
+            setDeleteDialogOpen(true);
+          }}
           selectedJobId={selectedJobId}
           canEdit={canEdit}
+          canDelete={canDelete}
           hasHazards={hasHazards}
           draggedJob={draggedJob}
           dragOverColumn={dragOverColumn}
@@ -250,6 +542,27 @@ export function JobKanbanBoard({
           handleDragEnd={handleDragEnd}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{jobToDelete?.jobName}&quot;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => jobToDelete && deleteJob(jobToDelete)}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -261,8 +574,12 @@ interface DesktopKanbanViewProps {
   columns: Column[];
   getJobsByStatus: (status: JobPlanStatus) => JobPlan[];
   onSelectJob?: (job: JobPlan) => void;
+  onUpdateName: (jobId: string, name: string) => void;
+  onDuplicate: (job: JobPlan) => void;
+  onDelete: (job: JobPlan) => void;
   selectedJobId?: string | null;
   canEdit: boolean;
+  canDelete: boolean;
   hasHazards: (job: JobPlan) => boolean;
   draggedJob: JobPlan | null;
   dragOverColumn: JobPlanStatus | null;
@@ -270,15 +587,19 @@ interface DesktopKanbanViewProps {
   handleDragOver: (e: React.DragEvent, columnId: JobPlanStatus) => void;
   handleDragLeave: () => void;
   handleDrop: (e: React.DragEvent, columnId: JobPlanStatus) => void;
-  handleDragEnd: () => void;
+  handleDragEnd: (e: React.DragEvent) => void;
 }
 
 function DesktopKanbanView({
   columns,
   getJobsByStatus,
   onSelectJob,
+  onUpdateName,
+  onDuplicate,
+  onDelete,
   selectedJobId,
   canEdit,
+  canDelete,
   hasHazards,
   draggedJob,
   dragOverColumn,
@@ -288,130 +609,348 @@ function DesktopKanbanView({
   handleDrop,
   handleDragEnd,
 }: DesktopKanbanViewProps) {
+  const { collapsed, toggleColumn } = useCollapsedColumns();
+
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {columns.map((column) => (
-        <div
-          key={column.id}
-          className={cn(
-            "flex-shrink-0 w-72 rounded-xl border-2 transition-colors",
-            column.color,
-            dragOverColumn === column.id && "ring-2 ring-orange-400"
-          )}
-          onDragOver={(e) => handleDragOver(e, column.id)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, column.id)}
-        >
-          {/* Column Header */}
-          <div className="p-3 border-b border-slate-200/50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {column.icon}
-                <span className="font-medium text-sm">{column.title}</span>
-              </div>
-              <span className="text-xs text-slate-500 bg-white/50 px-2 py-0.5 rounded-full">
-                {getJobsByStatus(column.id).length}
-              </span>
-            </div>
-          </div>
+    <div className="flex gap-3 overflow-x-auto pb-4">
+      {columns.map((column) => {
+        const columnJobs = getJobsByStatus(column.id);
+        const isCollapsed = collapsed[column.id];
 
-          {/* Column Content */}
-          <div className="p-2 space-y-2 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto">
-            {getJobsByStatus(column.id).map((job) => (
-              <div
-                key={job.id}
-                draggable={canEdit ? true : undefined}
-                onDragStart={(e) => handleDragStart(e, job)}
-                onDragEnd={handleDragEnd}
-                onClick={() => onSelectJob?.(job)}
-                className={cn(
-                  "bg-white rounded-lg p-3 shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition-all",
-                  canEdit && "cursor-grab active:cursor-grabbing",
-                  draggedJob?.id === job.id && "opacity-50",
-                  selectedJobId === job.id && "ring-2 ring-orange-400"
-                )}
-              >
-                {/* Drag Handle */}
-                {canEdit && (
-                  <div className="flex items-center justify-center mb-2 text-slate-300">
-                    <GripVertical className="h-4 w-4" />
-                  </div>
-                )}
-
-                {/* Job Name */}
-                <h3 className="font-medium text-sm text-slate-900 mb-2 line-clamp-1">
-                  {job.jobName}
-                </h3>
-
-                {/* Route Info */}
-                <div className="flex items-center gap-1 text-xs text-slate-500 mb-2">
-                  <MapPin className="h-3 w-3" />
-                  <span className="truncate">
-                    {job.startPoleId} → {job.endPoleId}
+        return (
+          <div
+            key={column.id}
+            className={cn(
+              "flex-shrink-0 rounded-xl border-2 transition-all duration-200",
+              column.color,
+              isCollapsed ? "w-14" : "w-80",
+              dragOverColumn === column.id && !isCollapsed && "ring-2 ring-orange-400 ring-offset-2"
+            )}
+            onDragOver={(e) => !isCollapsed && handleDragOver(e, column.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => !isCollapsed && handleDrop(e, column.id)}
+          >
+            {/* Column Header */}
+            <div
+              className={cn(
+                "p-3 border-b border-slate-200/50 cursor-pointer select-none",
+                isCollapsed && "flex flex-col items-center py-4"
+              )}
+              onClick={() => toggleColumn(column.id)}
+            >
+              <div className={cn("flex items-center justify-between", isCollapsed && "flex-col gap-2")}>
+                <div className={cn("flex items-center gap-2", isCollapsed && "flex-col")}>
+                  {column.icon}
+                  {!isCollapsed && <span className="font-medium text-sm">{column.title}</span>}
+                </div>
+                <div className={cn("flex items-center gap-1", isCollapsed && "flex-col")}>
+                  <span className={cn(
+                    "text-xs text-slate-600 bg-white/60 px-2 py-0.5 rounded-full font-medium",
+                    isCollapsed && "px-1.5"
+                  )}>
+                    {columnJobs.length}
                   </span>
-                </div>
-
-                {/* Distance */}
-                <div className="text-xs text-slate-500 mb-2">
-                  {job.totalDistance.toLocaleString()} ft
-                </div>
-
-                {/* Hazards indicator */}
-                {hasHazards(job) && (
-                  <div className="flex items-center gap-1 text-xs text-amber-600 mb-2">
-                    <AlertTriangle className="h-3 w-3" />
-                    <span>Hazards</span>
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  {/* Assigned Users */}
-                  <div className="flex items-center gap-1">
-                    {job.assignments.length > 0 ? (
-                      <div className="flex -space-x-1">
-                        {job.assignments.slice(0, 3).map((assignment) => (
-                          <div
-                            key={assignment.id}
-                            className="h-6 w-6 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-medium"
-                            title={assignment.user.name || assignment.user.email}
-                          >
-                            {(assignment.user.name || assignment.user.email)[0].toUpperCase()}
-                          </div>
-                        ))}
-                        {job.assignments.length > 3 && (
-                          <div className="h-6 w-6 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-medium">
-                            +{job.assignments.length - 3}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <Users className="h-3 w-3" />
-                        <span>Unassigned</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Comments Count */}
-                  {job._count.comments > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-slate-400">
-                      <MessageSquare className="h-3 w-3" />
-                      <span>{job._count.comments}</span>
-                    </div>
+                  {!isCollapsed && (
+                    <ChevronUp className="h-4 w-4 text-slate-400 rotate-90" />
                   )}
                 </div>
               </div>
-            ))}
+              {isCollapsed && (
+                <span className="text-xs text-slate-500 mt-2 [writing-mode:vertical-rl] rotate-180">
+                  {column.title}
+                </span>
+              )}
+            </div>
 
-            {getJobsByStatus(column.id).length === 0 && (
-              <div className="flex items-center justify-center h-24 text-xs text-slate-400">
-                No jobs
+            {/* Column Content */}
+            {!isCollapsed && (
+              <div className="p-2 space-y-2 min-h-[200px] max-h-[calc(100vh-320px)] overflow-y-auto">
+                {/* Drop Placeholder */}
+                {dragOverColumn === column.id && draggedJob && draggedJob.status !== column.id && (
+                  <div className="h-24 border-2 border-dashed border-orange-300 rounded-lg bg-orange-50/50 flex items-center justify-center text-sm text-orange-500">
+                    Drop here
+                  </div>
+                )}
+
+                {columnJobs.map((job) => (
+                  <DesktopJobCard
+                    key={job.id}
+                    job={job}
+                    onSelect={() => onSelectJob?.(job)}
+                    onUpdateName={onUpdateName}
+                    onDuplicate={() => onDuplicate(job)}
+                    onDelete={() => onDelete(job)}
+                    isSelected={selectedJobId === job.id}
+                    isDragging={draggedJob?.id === job.id}
+                    canEdit={canEdit}
+                    canDelete={canDelete}
+                    hasHazards={hasHazards(job)}
+                    handleDragStart={handleDragStart}
+                    handleDragEnd={handleDragEnd}
+                  />
+                ))}
+
+                {columnJobs.length === 0 && !dragOverColumn && (
+                  <div className="flex items-center justify-center h-24 text-xs text-slate-400">
+                    No jobs
+                  </div>
+                )}
               </div>
             )}
           </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================
+// Desktop Job Card Component
+// ============================================
+interface DesktopJobCardProps {
+  job: JobPlan;
+  onSelect: () => void;
+  onUpdateName: (jobId: string, name: string) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  isSelected: boolean;
+  isDragging: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  hasHazards: boolean;
+  handleDragStart: (e: React.DragEvent, job: JobPlan) => void;
+  handleDragEnd: (e: React.DragEvent) => void;
+}
+
+function DesktopJobCard({
+  job,
+  onSelect,
+  onUpdateName,
+  onDuplicate,
+  onDelete,
+  isSelected,
+  isDragging,
+  canEdit,
+  canDelete,
+  hasHazards,
+  handleDragStart,
+  handleDragEnd,
+}: DesktopJobCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(job.jobName);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const priority = priorityConfig[job.priority];
+  const dueStatus = getDueDateStatus(job.plannedEndDate);
+  const progress = job.totalDistance > 0 ? Math.min(100, (job.actualFootage / job.totalDistance) * 100) : 0;
+
+  const handleSaveName = () => {
+    if (editName.trim() && editName !== job.jobName) {
+      onUpdateName(job.id, editName.trim());
+    } else {
+      setEditName(job.jobName);
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveName();
+    } else if (e.key === "Escape") {
+      setEditName(job.jobName);
+      setIsEditing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  return (
+    <div
+      draggable={canEdit}
+      onDragStart={(e) => handleDragStart(e, job)}
+      onDragEnd={handleDragEnd}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={cn(
+        "bg-white rounded-lg shadow-sm border border-slate-200 transition-all duration-150 relative group",
+        priority.border,
+        canEdit && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-50 scale-[1.02] shadow-lg",
+        isSelected && "ring-2 ring-orange-400",
+        "hover:shadow-md"
+      )}
+    >
+      {/* Hover Actions */}
+      {isHovered && canEdit && !isEditing && (
+        <div className="absolute -top-2 right-2 flex gap-1 z-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+            className="h-7 w-7 rounded bg-white shadow border border-slate-200 flex items-center justify-center text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
+            title="Edit"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+            className="h-7 w-7 rounded bg-white shadow border border-slate-200 flex items-center justify-center text-slate-500 hover:text-emerald-600 hover:border-emerald-300 transition-colors"
+            title="Duplicate"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+          {canDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="h-7 w-7 rounded bg-white shadow border border-slate-200 flex items-center justify-center text-slate-500 hover:text-red-600 hover:border-red-300 transition-colors"
+              title="Delete"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-      ))}
+      )}
+
+      <div className="p-3" onClick={isEditing ? undefined : onSelect}>
+        {/* Drag Handle */}
+        {canEdit && (
+          <div className="flex items-center justify-center mb-1.5 text-slate-300">
+            <GripVertical className="h-4 w-4" />
+          </div>
+        )}
+
+        {/* Header Row: Title + Priority */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          {isEditing ? (
+            <Input
+              ref={inputRef}
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={handleSaveName}
+              onKeyDown={handleKeyDown}
+              className="h-7 text-sm font-medium"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <h3
+              className="font-medium text-sm text-slate-900 line-clamp-2 flex-1 cursor-text"
+              onDoubleClick={(e) => {
+                if (canEdit) {
+                  e.stopPropagation();
+                  setIsEditing(true);
+                }
+              }}
+              title="Double-click to edit"
+            >
+              {job.jobName}
+            </h3>
+          )}
+          {priority.badge && (
+            <span className={cn("text-[10px] font-medium px-1.5 py-0.5 rounded", priority.badge)}>
+              {priority.label}
+            </span>
+          )}
+        </div>
+
+        {/* Route Info */}
+        <div className="flex items-center gap-1 text-xs text-slate-500 mb-1.5">
+          <MapPin className="h-3 w-3 flex-shrink-0" />
+          <span className="truncate">
+            {job.startPoleId} → {job.endPoleId}
+          </span>
+        </div>
+
+        {/* Distance */}
+        <div className="text-xs text-slate-500 mb-2">
+          {job.totalDistance.toLocaleString()} ft
+        </div>
+
+        {/* Badges Row */}
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {hasHazards && (
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+              <AlertTriangle className="h-3 w-3" />
+              Hazards
+            </span>
+          )}
+          {dueStatus && (
+            <span className={cn("inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded", dueStatus.className)}>
+              <Calendar className="h-3 w-3" />
+              {dueStatus.label}
+            </span>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+          {/* Assigned Users */}
+          <div className="flex items-center gap-1">
+            {job.assignments.length > 0 ? (
+              <div className="flex -space-x-1">
+                {job.assignments.slice(0, 3).map((assignment) => (
+                  <div
+                    key={assignment.id}
+                    className="h-6 w-6 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-medium"
+                    title={assignment.user.name || assignment.user.email}
+                  >
+                    {(assignment.user.name || assignment.user.email)[0].toUpperCase()}
+                  </div>
+                ))}
+                {job.assignments.length > 3 && (
+                  <div className="h-6 w-6 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-medium">
+                    +{job.assignments.length - 3}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-xs text-slate-400">
+                <Users className="h-3 w-3" />
+                <span>Unassigned</span>
+              </div>
+            )}
+          </div>
+
+          {/* Comments Count */}
+          {job._count.comments > 0 && (
+            <div className="flex items-center gap-1 text-xs text-slate-400">
+              <MessageSquare className="h-3 w-3" />
+              <span>{job._count.comments}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Progress Bar - Only for IN_PROGRESS */}
+        {job.status === "IN_PROGRESS" && job.totalDistance > 0 && (
+          <div className="mt-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+              <span>Progress</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${progress}%`,
+                  background: `linear-gradient(90deg, #f97316 0%, #22c55e ${Math.min(100, progress + 20)}%)`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -438,7 +977,6 @@ function MobileListView({
   canEdit,
   hasHazards,
 }: MobileListViewProps) {
-  // Track which sections are expanded - active statuses expanded by default
   const [expandedSections, setExpandedSections] = useState<Record<JobPlanStatus, boolean>>({
     DRAFT: true,
     READY: true,
@@ -472,7 +1010,6 @@ function MobileListView({
               column.color
             )}
           >
-            {/* Section Header - Tap target 44px+ */}
             <button
               onClick={() => toggleSection(column.id)}
               className="w-full p-4 flex items-center justify-between min-h-[52px] active:bg-black/5 transition-colors"
@@ -495,7 +1032,6 @@ function MobileListView({
               </div>
             </button>
 
-            {/* Section Content - Animated */}
             <div
               className={cn(
                 "transition-all duration-200 ease-in-out overflow-hidden",
@@ -552,24 +1088,30 @@ function MobileJobCard({
   canEdit,
   hasHazards,
 }: MobileJobCardProps) {
+  const priority = priorityConfig[job.priority];
+  const dueStatus = getDueDateStatus(job.plannedEndDate);
+  const progress = job.totalDistance > 0 ? Math.min(100, (job.actualFootage / job.totalDistance) * 100) : 0;
+
   return (
     <div
       className={cn(
-        "bg-white rounded-xl p-4 shadow-sm border border-slate-200 transition-all",
+        "bg-white rounded-xl shadow-sm border border-slate-200 transition-all",
+        priority.border,
         isSelected && "ring-2 ring-orange-400"
       )}
     >
-      {/* Tappable area for job selection - min 44px */}
-      <div
-        onClick={onSelect}
-        className="cursor-pointer active:bg-slate-50 -m-4 p-4 mb-0 pb-3"
-      >
-        {/* Job Name */}
-        <h3 className="font-semibold text-base text-slate-900 mb-2">
-          {job.jobName}
-        </h3>
+      <div onClick={onSelect} className="cursor-pointer p-4 pb-3">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h3 className="font-semibold text-base text-slate-900">{job.jobName}</h3>
+          {priority.badge && (
+            <span className={cn("text-xs font-medium px-2 py-0.5 rounded", priority.badge)}>
+              {priority.label}
+            </span>
+          )}
+        </div>
 
-        {/* Route and Distance Row */}
+        {/* Route and Distance */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 text-sm text-slate-600">
             <MapPin className="h-4 w-4" />
@@ -580,11 +1122,38 @@ function MobileJobCard({
           </span>
         </div>
 
-        {/* Hazards Badge */}
-        {hasHazards && (
-          <div className="inline-flex items-center gap-1.5 text-sm text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full mb-2">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Hazards</span>
+        {/* Badges */}
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {hasHazards && (
+            <span className="inline-flex items-center gap-1.5 text-sm text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">
+              <AlertTriangle className="h-4 w-4" />
+              Hazards
+            </span>
+          )}
+          {dueStatus && (
+            <span className={cn("inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full", dueStatus.className)}>
+              <Calendar className="h-4 w-4" />
+              {dueStatus.label}
+            </span>
+          )}
+        </div>
+
+        {/* Progress Bar */}
+        {job.status === "IN_PROGRESS" && job.totalDistance > 0 && (
+          <div className="mb-2">
+            <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span>Progress</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${progress}%`,
+                  background: `linear-gradient(90deg, #f97316 0%, #22c55e 100%)`,
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -624,10 +1193,10 @@ function MobileJobCard({
         </div>
       </div>
 
-      {/* Status Change Dropdown - Only if can edit */}
+      {/* Status Change */}
       {canEdit && (
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <div className="flex items-center justify-between">
+        <div className="px-4 pb-4 pt-0">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
             <span className="text-sm text-slate-500">Status:</span>
             <Select
               value={job.status}
