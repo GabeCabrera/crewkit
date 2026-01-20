@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeRateLimit } from "@/lib/rate-limit";
+import { createJobPlanSchema, validateRequest } from "@/lib/validations";
 
 export const dynamic = 'force-dynamic';
 
@@ -113,45 +114,49 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Validate required fields (use undefined/null check to allow 0 for numeric fields)
-    const requiredFields = ["jobName", "startPoleId", "endPoleId", "totalDistance"];
-    for (const field of requiredFields) {
-      if (body[field] === undefined || body[field] === null || body[field] === "") {
-        return NextResponse.json(
-          { error: `Missing required field: ${field}` },
-          { status: 400 }
-        );
-      }
+    // Validate request body with Zod schema
+    const validation = validateRequest(createJobPlanSchema, body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: 400 }
+      );
     }
+
+    const data = validation.data;
 
     const jobPlan = await prisma.jobPlan.create({
       data: {
         // Permits
-        rmpPermitApproved: body.rmpPermitApproved ?? false,
-        sesdPermitApproved: body.sesdPermitApproved ?? false,
-        makeReadyComplete: body.makeReadyComplete ?? false,
-        easementsClear: body.easementsClear ?? false,
+        rmpPermitApproved: data.rmpPermitApproved,
+        sesdPermitApproved: data.sesdPermitApproved,
+        makeReadyComplete: data.makeReadyComplete,
+        easementsClear: data.easementsClear,
         // Route
-        jobName: body.jobName,
-        startPoleId: body.startPoleId,
-        endPoleId: body.endPoleId,
-        totalDistance: body.totalDistance,
-        // Materials
-        strandFootage: body.strandFootage ?? body.totalDistance,
-        fiberFootage: body.fiberFootage ?? Math.round(body.totalDistance * 1.1),
-        deadEnds: body.deadEnds ?? 0,
-        tangents: body.tangents ?? 0,
-        anchors: body.anchors ?? 0,
+        jobName: data.jobName,
+        startPoleId: data.startPoleId,
+        endPoleId: data.endPoleId,
+        totalDistance: data.totalDistance,
+        // Materials (with defaults based on totalDistance)
+        strandFootage: data.strandFootage ?? data.totalDistance,
+        fiberFootage: data.fiberFootage ?? Math.round(data.totalDistance * 1.1),
+        deadEnds: data.deadEnds,
+        tangents: data.tangents,
+        anchors: data.anchors,
         // Hazards
-        trafficControl: body.trafficControl ?? false,
-        treeTrimming: body.treeTrimming ?? false,
-        animalHazards: body.animalHazards ?? false,
-        waterRailCrossing: body.waterRailCrossing ?? false,
-        foremanNotes: body.foremanNotes ?? null,
-        // Status - default to DRAFT for new jobs created via quick-create flow
-        status: body.status ?? "DRAFT",
-        // Priority - default to MEDIUM
-        priority: body.priority ?? "MEDIUM",
+        trafficControl: data.trafficControl,
+        treeTrimming: data.treeTrimming,
+        animalHazards: data.animalHazards,
+        waterRailCrossing: data.waterRailCrossing,
+        foremanNotes: data.foremanNotes,
+        // Scheduling
+        plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate) : null,
+        plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate) : null,
+        estimatedDuration: data.estimatedDuration,
+        durationUnit: data.durationUnit,
+        // Status and Priority
+        status: data.status,
+        priority: data.priority,
         // Creator
         createdById: session.user.id,
       },

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeRateLimit } from "@/lib/rate-limit";
+import { updateJobPlanSchema, validateRequest } from "@/lib/validations";
 
 export const dynamic = 'force-dynamic';
 
@@ -131,30 +132,28 @@ export async function PATCH(
 
     const body = await request.json();
 
-    // Build update data - only include fields that are provided
-    const updateData: Record<string, unknown> = {};
-    
-    const allowedFields = [
-      // Planning - Permits
-      "rmpPermitApproved", "sesdPermitApproved", "makeReadyComplete", "easementsClear",
-      // Planning - Route
-      "jobName", "startPoleId", "endPoleId", "totalDistance",
-      // Planning - Materials
-      "strandFootage", "fiberFootage", "deadEnds", "tangents", "anchors",
-      // Planning - Hazards
-      "trafficControl", "treeTrimming", "animalHazards", "waterRailCrossing",
-      "foremanNotes",
-      // Planning - Scheduling
-      "plannedStartDate", "plannedEndDate", "estimatedDuration", "durationUnit",
-      // Reporting
-      "foremanSignoff", "signoffDate", "lessonsLearned", "completedAt",
-      // Status and Priority
-      "status", "priority"
-    ];
+    // Validate request body with Zod schema
+    const validation = validateRequest(updateJobPlanSchema, body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error },
+        { status: 400 }
+      );
+    }
 
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
+    // Build update data from validated fields (only non-undefined)
+    const updateData: Record<string, unknown> = {};
+    const validatedData = validation.data;
+    
+    for (const [key, value] of Object.entries(validatedData)) {
+      if (value !== undefined) {
+        // Convert date strings to Date objects for Prisma
+        if ((key === "plannedStartDate" || key === "plannedEndDate" || 
+             key === "signoffDate" || key === "completedAt") && value) {
+          updateData[key] = new Date(value as string);
+        } else {
+          updateData[key] = value;
+        }
       }
     }
 

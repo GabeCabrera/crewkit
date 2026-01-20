@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   MapPin,
   Users,
@@ -189,8 +190,7 @@ export function JobKanbanBoard({
   viewOnly = false,
 }: JobKanbanBoardProps) {
   const { data: session } = useSession();
-  const [jobs, setJobs] = useState<JobPlan[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [draggedJob, setDraggedJob] = useState<JobPlan | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<JobPlanStatus | null>(null);
   const isMobile = useIsMobile();
@@ -213,23 +213,22 @@ export function JobKanbanBoard({
   const canEdit = !viewOnly && !!session?.user?.role && ["MANAGER", "ADMIN", "SUPERUSER"].includes(session.user.role);
   const canDelete = !viewOnly && !!session?.user?.role && session.user.role !== "FIELD";
 
-  const fetchJobs = useCallback(async () => {
-    try {
+  // Fetch jobs with TanStack Query + background refetch
+  const { data: jobs = [], isLoading } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: async () => {
       const response = await fetch("/api/job-plans");
-      if (response.ok) {
-        const data = await response.json();
-        setJobs(data);
-      }
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+      if (!response.ok) throw new Error("Failed to fetch jobs");
+      return response.json() as Promise<JobPlan[]>;
+    },
+    // Background refetch every 30 seconds for near-real-time updates
+    refetchInterval: 30 * 1000,
+    // Also refetch when tab becomes visible again
+    refetchOnWindowFocus: true,
+  });
 
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+  // Helper to refresh jobs
+  const refetchJobs = () => queryClient.invalidateQueries({ queryKey: ["jobs"] });
 
   // Get unique assignees for filter dropdown
   const uniqueAssignees = Array.from(
@@ -275,35 +274,67 @@ export function JobKanbanBoard({
     setHazardsFilter(false);
   };
 
-  const updateJobStatus = async (jobId: string, newStatus: JobPlanStatus) => {
-    // Optimistic update
-    setJobs((prev) =>
-      prev.map((job) =>
-        job.id === jobId ? { ...job, status: newStatus } : job
-      )
-    );
-    try {
+  // Update job status mutation with optimistic update
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ jobId, newStatus }: { jobId: string; newStatus: JobPlanStatus }) => {
       const response = await fetch(`/api/job-plans/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!response.ok) {
-        // Revert on error
-        fetchJobs();
+      if (!response.ok) throw new Error("Failed to update status");
+      return response.json();
+    },
+    onMutate: async ({ jobId, newStatus }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["jobs"] });
+      // Snapshot previous value
+      const previousJobs = queryClient.getQueryData<JobPlan[]>(["jobs"]);
+      // Optimistically update
+      queryClient.setQueryData<JobPlan[]>(["jobs"], (old) =>
+        old?.map((job) => (job.id === jobId ? { ...job, status: newStatus } : job))
+      );
+      return { previousJobs };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousJobs) {
+        queryClient.setQueryData(["jobs"], context.previousJobs);
       }
-    } catch (error) {
-      console.error("Error updating job status:", error);
-      fetchJobs();
-    }
+      console.error("Error updating job status:", err);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+
+  const updateJobStatus = (jobId: string, newStatus: JobPlanStatus) => {
+    updateStatusMutation.mutate({ jobId, newStatus });
   };
+
+  // Update job name with debounce (keeping the debounce logic for rapid typing)
+  const updateNameMutation = useMutation({
+    mutationFn: async ({ jobId, newName }: { jobId: string; newName: string }) => {
+      const response = await fetch(`/api/job-plans/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobName: newName }),
+        signal: nameUpdateAbortRef.current?.signal,
+      });
+      if (!response.ok) throw new Error("Failed to update name");
+      return response.json();
+    },
+    onError: (err) => {
+      if (err instanceof Error && err.name === "AbortError") return;
+      console.error("Error updating job name:", err);
+      refetchJobs();
+    },
+  });
 
   const updateJobName = (jobId: string, newName: string) => {
     // Optimistic update (immediate UI feedback)
-    setJobs((prev) =>
-      prev.map((job) =>
-        job.id === jobId ? { ...job, jobName: newName } : job
-      )
+    queryClient.setQueryData<JobPlan[]>(["jobs"], (old) =>
+      old?.map((job) => (job.id === jobId ? { ...job, jobName: newName } : job))
     );
 
     // Debounce the actual API save
@@ -311,60 +342,69 @@ export function JobKanbanBoard({
       clearTimeout(nameUpdateTimeoutRef.current);
     }
 
-    nameUpdateTimeoutRef.current = setTimeout(async () => {
-      // Abort any in-flight request
+    nameUpdateTimeoutRef.current = setTimeout(() => {
       if (nameUpdateAbortRef.current) {
         nameUpdateAbortRef.current.abort();
       }
       nameUpdateAbortRef.current = new AbortController();
-
-      try {
-        const response = await fetch(`/api/job-plans/${jobId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobName: newName }),
-          signal: nameUpdateAbortRef.current.signal,
-        });
-        if (!response.ok) {
-          fetchJobs();
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === "AbortError") {
-          return;
-        }
-        console.error("Error updating job name:", error);
-        fetchJobs();
-      }
+      updateNameMutation.mutate({ jobId, newName });
     }, 500);
   };
 
-  const duplicateJob = async (job: JobPlan) => {
-    try {
+  // Duplicate job mutation
+  const duplicateMutation = useMutation({
+    mutationFn: async (job: JobPlan) => {
       const response = await fetch(`/api/job-plans/${job.id}/duplicate`, {
         method: "POST",
       });
-      if (response.ok) {
-        const newJob = await response.json();
-        setJobs((prev) => [newJob, ...prev]);
-      }
-    } catch (error) {
-      console.error("Error duplicating job:", error);
-    }
+      if (!response.ok) throw new Error("Failed to duplicate job");
+      return response.json() as Promise<JobPlan>;
+    },
+    onSuccess: (newJob) => {
+      // Add new job to cache immediately
+      queryClient.setQueryData<JobPlan[]>(["jobs"], (old) => [newJob, ...(old || [])]);
+    },
+    onError: (err) => {
+      console.error("Error duplicating job:", err);
+    },
+  });
+
+  const duplicateJob = (job: JobPlan) => {
+    duplicateMutation.mutate(job);
   };
 
-  const deleteJob = async (job: JobPlan) => {
-    try {
+  // Delete job mutation with optimistic update
+  const deleteMutation = useMutation({
+    mutationFn: async (job: JobPlan) => {
       const response = await fetch(`/api/job-plans/${job.id}`, {
         method: "DELETE",
       });
-      if (response.ok) {
-        setJobs((prev) => prev.filter((j) => j.id !== job.id));
+      if (!response.ok) throw new Error("Failed to delete job");
+      return job.id;
+    },
+    onMutate: async (job) => {
+      await queryClient.cancelQueries({ queryKey: ["jobs"] });
+      const previousJobs = queryClient.getQueryData<JobPlan[]>(["jobs"]);
+      queryClient.setQueryData<JobPlan[]>(["jobs"], (old) =>
+        old?.filter((j) => j.id !== job.id)
+      );
+      return { previousJobs };
+    },
+    onError: (err, job, context) => {
+      if (context?.previousJobs) {
+        queryClient.setQueryData(["jobs"], context.previousJobs);
       }
-    } catch (error) {
-      console.error("Error deleting job:", error);
-    }
-    setDeleteDialogOpen(false);
-    setJobToDelete(null);
+      console.error("Error deleting job:", err);
+    },
+    onSettled: () => {
+      setDeleteDialogOpen(false);
+      setJobToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    },
+  });
+
+  const deleteJob = (job: JobPlan) => {
+    deleteMutation.mutate(job);
   };
 
   const handleDragStart = (e: React.DragEvent, job: JobPlan) => {
@@ -433,7 +473,7 @@ export function JobKanbanBoard({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchJobs} className="h-9">
+          <Button variant="outline" size="sm" onClick={refetchJobs} className="h-9">
             <RefreshCw className="h-4 w-4" />
           </Button>
           {onCreateNew && !viewOnly && (
