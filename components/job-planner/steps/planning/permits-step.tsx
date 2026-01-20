@@ -20,7 +20,7 @@ import {
   Trash2,
   Upload as UploadIcon,
   FileText,
-  Image,
+  Image as ImageIcon,
   Download,
   Loader2,
   ChevronDown,
@@ -274,7 +274,7 @@ export function PermitsStep({ job, canEdit, refreshJob }: PermitsStepProps) {
   // Get file icon
   const getFileIcon = (fileType: string) => {
     if (fileType.startsWith("image/")) {
-      return <Image className="h-4 w-4" />;
+      return <ImageIcon className="h-4 w-4" />;
     }
     return <FileText className="h-4 w-4" />;
   };

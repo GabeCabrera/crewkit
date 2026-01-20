@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { del, handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { del } from "@vercel/blob";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -122,13 +123,25 @@ export async function POST(
         try {
           const payload = JSON.parse(tokenPayload || "{}");
           
+          // Get file size from blob URL via HEAD request
+          let fileSize = 0;
+          try {
+            const headResponse = await fetch(blob.url, { method: 'HEAD' });
+            const contentLength = headResponse.headers.get('content-length');
+            if (contentLength) {
+              fileSize = parseInt(contentLength, 10);
+            }
+          } catch {
+            // If we can't get the size, default to 0
+          }
+          
           await prisma.permitDocument.create({
             data: {
               jobPermitId: payload.permitId,
               fileName: blob.pathname.split('/').pop() || 'document',
               fileUrl: blob.url,
               fileType: blob.contentType || 'application/octet-stream',
-              fileSize: blob.size,
+              fileSize,
               uploadedById: payload.userId,
             },
           });

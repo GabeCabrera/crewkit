@@ -19,7 +19,7 @@ import {
   Maximize2,
   Info,
   FileText,
-  Image,
+  Image as ImageIcon,
   Download,
   ChevronDown,
   ChevronUp,
@@ -529,7 +529,7 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
                                   className="flex items-center gap-2 p-1.5 rounded hover:bg-slate-50 text-sm"
                                 >
                                   {doc.fileType.startsWith("image/") ? (
-                                    <Image className="h-4 w-4 text-slate-400" />
+                                    <ImageIcon className="h-4 w-4 text-slate-400" />
                                   ) : (
                                     <FileText className="h-4 w-4 text-slate-400" />
                                   )}
