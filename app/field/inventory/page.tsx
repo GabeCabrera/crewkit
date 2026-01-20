@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { TablePageSkeleton, PageContent } from "@/components/layout/page-skeleton";
 import { Input } from "@/components/ui/input";
@@ -73,6 +73,7 @@ export default function FieldInventoryPage() {
     lowStock: 0,
     outOfStock: 0,
   });
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -83,6 +84,12 @@ export default function FieldInventoryPage() {
   }, [search]);
 
   const fetchInventory = useCallback(async (page = 1) => {
+    // Cancel any in-flight request to prevent stale data
+    if (fetchAbortRef.current) {
+      fetchAbortRef.current.abort();
+    }
+    fetchAbortRef.current = new AbortController();
+
     try {
       const params = new URLSearchParams();
       params.set("page", page.toString());
@@ -98,7 +105,9 @@ export default function FieldInventoryPage() {
         params.set("unitType", unitType);
       }
 
-      const response = await fetch(`/api/inventory?${params.toString()}`);
+      const response = await fetch(`/api/inventory?${params.toString()}`, {
+        signal: fetchAbortRef.current.signal,
+      });
       const data = await response.json();
       
       setInventory(data.data || []);
@@ -106,6 +115,10 @@ export default function FieldInventoryPage() {
       setSummary(data.summary || { total: 0, inStock: 0, lowStock: 0, outOfStock: 0 });
       setUnitTypes(data.unitTypes || []);
     } catch (error) {
+      // Ignore aborted requests (they were superseded by a newer search)
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       console.error("Error fetching inventory:", error);
     } finally {
       setLoading(false);

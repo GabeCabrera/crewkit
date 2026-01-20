@@ -206,6 +206,10 @@ export function JobKanbanBoard({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<JobPlan | null>(null);
 
+  // Refs for debounced name update
+  const nameUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nameUpdateAbortRef = useRef<AbortController | null>(null);
+
   const canEdit = !viewOnly && !!session?.user?.role && ["MANAGER", "ADMIN", "SUPERUSER"].includes(session.user.role);
   const canDelete = !viewOnly && !!session?.user?.role && ["ADMIN", "SUPERUSER"].includes(session.user.role);
 
@@ -294,26 +298,44 @@ export function JobKanbanBoard({
     }
   };
 
-  const updateJobName = async (jobId: string, newName: string) => {
-    // Optimistic update
+  const updateJobName = (jobId: string, newName: string) => {
+    // Optimistic update (immediate UI feedback)
     setJobs((prev) =>
       prev.map((job) =>
         job.id === jobId ? { ...job, jobName: newName } : job
       )
     );
-    try {
-      const response = await fetch(`/api/job-plans/${jobId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobName: newName }),
-      });
-      if (!response.ok) {
+
+    // Debounce the actual API save
+    if (nameUpdateTimeoutRef.current) {
+      clearTimeout(nameUpdateTimeoutRef.current);
+    }
+
+    nameUpdateTimeoutRef.current = setTimeout(async () => {
+      // Abort any in-flight request
+      if (nameUpdateAbortRef.current) {
+        nameUpdateAbortRef.current.abort();
+      }
+      nameUpdateAbortRef.current = new AbortController();
+
+      try {
+        const response = await fetch(`/api/job-plans/${jobId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobName: newName }),
+          signal: nameUpdateAbortRef.current.signal,
+        });
+        if (!response.ok) {
+          fetchJobs();
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          return;
+        }
+        console.error("Error updating job name:", error);
         fetchJobs();
       }
-    } catch (error) {
-      console.error("Error updating job name:", error);
-      fetchJobs();
-    }
+    }, 500);
   };
 
   const duplicateJob = async (job: JobPlan) => {

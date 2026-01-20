@@ -106,6 +106,8 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Partial<JobPlanData>>({});
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const canEdit =
     session?.user?.role === "MANAGER" ||
@@ -132,6 +134,34 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
   useEffect(() => {
     fetchJob();
   }, [fetchJob]);
+
+  // Cleanup: flush pending saves on unmount
+  useEffect(() => {
+    return () => {
+      // Clear any pending debounce timer
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      // Abort any in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Flush any pending updates before unmount (fire-and-forget)
+      if (Object.keys(pendingUpdatesRef.current).length > 0) {
+        fetch(`/api/job-plans/${jobId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pendingUpdatesRef.current),
+          // Use keepalive to ensure request completes even after page unload
+          keepalive: true,
+        }).catch(() => {
+          // Silently fail on unmount - nothing we can do
+        });
+      }
+    };
+  }, [jobId]);
 
   // Calculate which steps are complete
   const calculateCompletedSteps = (jobData: JobPlanData) => {
@@ -212,12 +242,15 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
     setCompletedSteps(completed);
   };
 
-  // Auto-save with debounce
+  // Auto-save with debounce and batched updates (ClickUp-style)
   const autoSave = useCallback(
-    async (updates: Partial<JobPlanData>) => {
+    (updates: Partial<JobPlanData>) => {
       if (!job) return;
 
-      // Clear any pending save
+      // Merge new updates into pending queue (accumulate all changes)
+      pendingUpdatesRef.current = { ...pendingUpdatesRef.current, ...updates };
+
+      // Clear existing timer to reset debounce
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
@@ -226,11 +259,22 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
       // Debounce the actual save
       saveTimeoutRef.current = setTimeout(async () => {
+        // Abort any in-flight request (superseded by this one)
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+
+        // Grab all pending updates and clear the queue
+        const updatesToSave = { ...pendingUpdatesRef.current };
+        pendingUpdatesRef.current = {};
+
         try {
           const response = await fetch(`/api/job-plans/${jobId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updates),
+            body: JSON.stringify(updatesToSave),
+            signal: abortControllerRef.current.signal,
           });
 
           if (!response.ok) {
@@ -244,8 +288,14 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
           // Reset to idle after showing "saved"
           setTimeout(() => setSaveStatus("idle"), 2000);
-        } catch (error) {
+        } catch (error: unknown) {
+          // Ignore aborted requests (they were superseded)
+          if (error instanceof Error && error.name === "AbortError") {
+            return;
+          }
           console.error("Error saving:", error);
+          // Re-queue failed updates for retry (merge with any new pending updates)
+          pendingUpdatesRef.current = { ...updatesToSave, ...pendingUpdatesRef.current };
           setSaveStatus("idle");
         }
       }, 500);

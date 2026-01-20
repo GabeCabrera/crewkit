@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,7 @@ export default function InventoryPage() {
     hasMore: false,
   });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const fetchAbortRef = useRef<AbortController | null>(null);
   
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
@@ -192,6 +193,12 @@ export default function InventoryPage() {
   };
 
   const fetchEquipment = async (page: number = 1, search?: string) => {
+    // Cancel any in-flight request to prevent stale data
+    if (fetchAbortRef.current) {
+      fetchAbortRef.current.abort();
+    }
+    fetchAbortRef.current = new AbortController();
+
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -201,7 +208,9 @@ export default function InventoryPage() {
         params.set("search", search);
       }
       
-      const response = await fetch(`/api/equipment?${params}`);
+      const response = await fetch(`/api/equipment?${params}`, {
+        signal: fetchAbortRef.current.signal,
+      });
       const result = await response.json();
       
       // Handle paginated response
@@ -233,6 +242,10 @@ export default function InventoryPage() {
         setEquipment([]);
       }
     } catch (error) {
+      // Ignore aborted requests (they were superseded by a newer search)
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       console.error("Error fetching equipment:", error);
       setEquipment([]);
     }

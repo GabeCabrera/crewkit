@@ -40,6 +40,8 @@ export function JobComments({ jobPlanId }: JobCommentsProps) {
   const [cursorPosition, setCursorPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchComments = useCallback(async () => {
     try {
@@ -55,29 +57,42 @@ export function JobComments({ jobPlanId }: JobCommentsProps) {
     }
   }, [jobPlanId]);
 
-  const searchUsers = useCallback(async (query: string) => {
-    try {
-      const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}&limit=5`);
-      if (response.ok) {
-        const data = await response.json();
-        setMentionUsers(data);
-      }
-    } catch (error) {
-      console.error("Error searching users:", error);
-    }
-  }, []);
-
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
 
+  // Debounced user search with AbortController
   useEffect(() => {
-    if (mentionSearch) {
-      searchUsers(mentionSearch);
-    } else {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    
+    if (!mentionSearch) {
       setMentionUsers([]);
+      return;
     }
-  }, [mentionSearch, searchUsers]);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      if (searchAbortRef.current) searchAbortRef.current.abort();
+      searchAbortRef.current = new AbortController();
+
+      try {
+        const response = await fetch(
+          `/api/users/search?q=${encodeURIComponent(mentionSearch)}&limit=5`,
+          { signal: searchAbortRef.current.signal }
+        );
+        if (response.ok) {
+          setMentionUsers(await response.json());
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Error searching users:", error);
+        }
+      }
+    }, 200);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [mentionSearch]);
 
   const handleTextChange = (
     value: string,
