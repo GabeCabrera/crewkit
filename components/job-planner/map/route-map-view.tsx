@@ -113,6 +113,18 @@ export function RouteMapView({
     ? mapConfig.layers.find((l) => l.id === selectedLayerId)
     : null;
 
+  // Sync layers from initialConfig when it changes (e.g., after API load)
+  useEffect(() => {
+    if (initialConfig) {
+      setMapConfig(prev => ({
+        ...prev,
+        center: initialConfig.center || prev.center,
+        zoom: initialConfig.zoom ?? prev.zoom,
+        layers: initialConfig.layers || prev.layers,
+      }));
+    }
+  }, [initialConfig]);
+
   // Handle measurement completion
   const handleMeasurementComplete = useCallback((result: MeasurementResult) => {
     setLastMeasurement(result);
