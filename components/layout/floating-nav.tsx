@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { X, Home, Package, Layers, Users, Settings, FileText, Users2 } from "lucide-react";
+import { X, Home, Package, Layers, Users, Settings, FileText, Users2, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +39,7 @@ export function FloatingNav({ isOpen, onOpenChange }: FloatingNavProps) {
       case "ADMIN":
         allItems = [
           { href: "/admin", icon: Home, label: "Dashboard" },
+          { href: "/admin/jobs", icon: Briefcase, label: "Jobs" },
           { href: "/admin/inventory", icon: Package, label: "Inventory" },
           { href: "/admin/reports", icon: FileText, label: "Reports" },
           { href: "/admin/team-management", icon: Users2, label: "Team Mgmt" },
@@ -48,6 +49,7 @@ export function FloatingNav({ isOpen, onOpenChange }: FloatingNavProps) {
       case "MANAGER":
         allItems = [
           { href: "/manager", icon: Home, label: "Dashboard" },
+          { href: "/manager/jobs", icon: Briefcase, label: "Jobs" },
           { href: "/manager/inventory", icon: Package, label: "Inventory" },
           { href: "/manager/assemblies", icon: Layers, label: "Assemblies" },
           { href: "/manager/reports", icon: FileText, label: "Reports" },
@@ -56,6 +58,7 @@ export function FloatingNav({ isOpen, onOpenChange }: FloatingNavProps) {
       case "FIELD":
         allItems = [
           { href: "/field", icon: Home, label: "Home" },
+          { href: "/field/jobs", icon: Briefcase, label: "My Jobs" },
           { href: "/field/assemblies", icon: Layers, label: "Assemblies" },
           { href: "/field/inventory", icon: Package, label: "Inventory" },
           { href: "/field/today", icon: FileText, label: "Today" },
@@ -271,6 +274,7 @@ export function getSecondaryNavItems(role: string): NavItem[] {
     case "ADMIN":
       allItems = [
         { href: "/admin", icon: Home, label: "Dashboard" },
+        { href: "/admin/jobs", icon: Briefcase, label: "Jobs" },
         { href: "/admin/inventory", icon: Package, label: "Inventory" },
         { href: "/admin/reports", icon: FileText, label: "Reports" },
         { href: "/admin/team-management", icon: Users2, label: "Team Management" },
@@ -280,6 +284,7 @@ export function getSecondaryNavItems(role: string): NavItem[] {
     case "MANAGER":
       allItems = [
         { href: "/manager", icon: Home, label: "Dashboard" },
+        { href: "/manager/jobs", icon: Briefcase, label: "Jobs" },
         { href: "/manager/inventory", icon: Package, label: "Inventory" },
         { href: "/manager/assemblies", icon: Layers, label: "Assemblies" },
         { href: "/manager/reports", icon: FileText, label: "Reports" },
@@ -288,6 +293,7 @@ export function getSecondaryNavItems(role: string): NavItem[] {
     case "FIELD":
       allItems = [
         { href: "/field", icon: Home, label: "Home" },
+        { href: "/field/jobs", icon: Briefcase, label: "My Jobs" },
         { href: "/field/assemblies", icon: Layers, label: "Assemblies" },
         { href: "/field/inventory", icon: Package, label: "Inventory" },
         { href: "/field/today", icon: FileText, label: "Today" },

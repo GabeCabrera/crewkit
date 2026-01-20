@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Users2,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
@@ -137,6 +138,7 @@ export function Sidebar() {
       case "ADMIN":
         return [
           { href: "/admin", icon: Home, label: "Dashboard" },
+          { href: "/admin/jobs", icon: Briefcase, label: "Jobs" },
           { href: "/admin/inventory", icon: Package, label: "Inventory" },
           { href: "/admin/reports", icon: FileText, label: "Reports" },
           { href: "/admin/team-management", icon: Users2, label: "Team Management" },
@@ -145,6 +147,7 @@ export function Sidebar() {
       case "MANAGER":
         return [
           { href: "/manager", icon: Home, label: "Dashboard" },
+          { href: "/manager/jobs", icon: Briefcase, label: "Jobs" },
           { href: "/manager/inventory", icon: Package, label: "Inventory" },
           { href: "/manager/assemblies", icon: Layers, label: "Assemblies" },
           { href: "/manager/reports", icon: FileText, label: "Reports" },
@@ -152,6 +155,7 @@ export function Sidebar() {
       case "FIELD":
         return [
           { href: "/field", icon: Home, label: "Home" },
+          { href: "/field/jobs", icon: Briefcase, label: "My Jobs" },
           { href: "/field/assemblies", icon: Layers, label: "Assemblies" },
           { href: "/field/inventory", icon: Package, label: "Inventory" },
           { href: "/field/today", icon: FileText, label: "Today" },
