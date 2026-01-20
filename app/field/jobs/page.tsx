@@ -66,6 +66,7 @@ function FieldJobsPageContent() {
           jobId={selectedJobId}
           onClose={handleCloseDetail}
           onUpdate={handleJobUpdated}
+          basePath="/field/jobs"
         />
       )}
     </div>

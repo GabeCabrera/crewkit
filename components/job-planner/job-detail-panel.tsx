@@ -16,7 +16,9 @@ import {
   TreePine,
   Bug,
   Waves,
+  Maximize2,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,6 +87,7 @@ interface JobDetailPanelProps {
   jobId: string;
   onClose: () => void;
   onUpdate?: () => void;
+  basePath?: string; // e.g., "/admin/jobs" or "/manager/jobs"
 }
 
 const statusOptions: { value: JobPlanStatus; label: string; color: string }[] = [
@@ -95,7 +98,7 @@ const statusOptions: { value: JobPlanStatus; label: string; color: string }[] = 
   { value: "CANCELLED", label: "Cancelled", color: "bg-red-100 text-red-700" },
 ];
 
-export function JobDetailPanel({ jobId, onClose, onUpdate }: JobDetailPanelProps) {
+export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jobs" }: JobDetailPanelProps) {
   const { data: session } = useSession();
   const [job, setJob] = useState<JobPlanDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -236,6 +239,11 @@ export function JobDetailPanel({ jobId, onClose, onUpdate }: JobDetailPanelProps
           {job.jobName}
         </h2>
         <div className="flex items-center gap-2">
+          <Link href={`${basePath}/${jobId}`}>
+            <Button variant="outline" size="sm" title="Open full view">
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          </Link>
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Printer className="h-4 w-4" />
           </Button>

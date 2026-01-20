@@ -78,6 +78,7 @@ function JobsPageContent() {
           jobId={selectedJobId}
           onClose={handleCloseDetail}
           onUpdate={handleJobUpdated}
+          basePath="/admin/jobs"
         />
       )}
 

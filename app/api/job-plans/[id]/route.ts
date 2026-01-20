@@ -135,17 +135,53 @@ export async function PATCH(
     const updateData: Record<string, unknown> = {};
     
     const allowedFields = [
+      // Planning - Permits
       "rmpPermitApproved", "sesdPermitApproved", "makeReadyComplete", "easementsClear",
+      // Planning - Route
       "jobName", "startPoleId", "endPoleId", "totalDistance",
+      // Planning - Materials
       "strandFootage", "fiberFootage", "deadEnds", "tangents", "anchors",
+      // Planning - Hazards
       "trafficControl", "treeTrimming", "animalHazards", "waterRailCrossing",
-      "foremanNotes", "status"
+      "foremanNotes",
+      // Planning - Scheduling
+      "plannedStartDate", "plannedEndDate", "estimatedDuration", "durationUnit",
+      // Reporting
+      "foremanSignoff", "signoffDate", "lessonsLearned", "completedAt",
+      // Status (manual override)
+      "status"
     ];
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updateData[field] = body[field];
       }
+    }
+
+    // Auto-status logic
+    // Get current state with pending updates applied
+    const mergedState = { ...existingPlan, ...updateData };
+    
+    // Check if all permits are now complete
+    const allPermitsComplete = 
+      mergedState.rmpPermitApproved && 
+      mergedState.sesdPermitApproved && 
+      mergedState.makeReadyComplete && 
+      mergedState.easementsClear;
+
+    // Auto-update status to READY when all permits checked (only if currently DRAFT)
+    if (allPermitsComplete && existingPlan.status === "DRAFT" && !body.status) {
+      updateData.status = "READY";
+    }
+
+    // Auto-update status to COMPLETED when signed off
+    if (body.foremanSignoff === true && existingPlan.status === "IN_PROGRESS" && !body.status) {
+      updateData.status = "COMPLETED";
+    }
+
+    // Revert to IN_PROGRESS if sign-off is removed
+    if (body.foremanSignoff === false && existingPlan.status === "COMPLETED" && !body.status) {
+      updateData.status = "IN_PROGRESS";
     }
 
     const jobPlan = await prisma.jobPlan.update({
