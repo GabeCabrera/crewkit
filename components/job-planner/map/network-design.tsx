@@ -422,24 +422,28 @@ export function NetworkDesign({ jobId, enabled, canEdit }: NetworkDesignProps) {
       return;
     }
     
-    // Select mode - select the node
-    setSelection({ type: "node", data: node });
+    // Select mode - select the node (use setTimeout to avoid React render issues)
+    setTimeout(() => setSelection({ type: "node", data: node }), 0);
   }, [mode, canEdit, connectingFrom, createRoute]);
   
   // Handle route click
   const handleRouteClick = useCallback((route: MapRoute) => {
-    setSelection({ type: "route", data: route });
+    // Use setTimeout to avoid React render issues with radix-ui components
+    setTimeout(() => setSelection({ type: "route", data: route }), 0);
   }, []);
   
   // Handle element picker selection
   const handlePickerSelect = useCallback((element: { type: string; data: unknown }) => {
+    // Clear picker first
+    setPickerElements([]);
+    setPickerPosition(null);
+    
+    // Then handle selection (these already use setTimeout internally)
     if (element.type === "node") {
       handleNodeClick(element.data as MapNode);
     } else {
       handleRouteClick(element.data as MapRoute);
     }
-    setPickerElements([]);
-    setPickerPosition(null);
   }, [handleNodeClick, handleRouteClick]);
   
   if (!enabled) return null;

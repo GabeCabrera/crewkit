@@ -139,7 +139,10 @@ export function DesignProperties({
             <Label className="text-xs">Node Type</Label>
             <Select
               value={node.nodeType.id}
-              onValueChange={(value) => onUpdateNode(node.id, { nodeTypeId: value })}
+              onValueChange={(value) => {
+                // Use setTimeout to avoid state updates during radix-ui's internal render cycle
+                setTimeout(() => onUpdateNode(node.id, { nodeTypeId: value }), 0);
+              }}
               disabled={isSaving}
             >
               <SelectTrigger className="h-9">
@@ -300,7 +303,10 @@ export function DesignProperties({
           <Label className="text-xs">Route Type</Label>
           <Select
             value={route.routeType}
-            onValueChange={(value) => onUpdateRoute(route.id, { routeType: value })}
+            onValueChange={(value) => {
+              // Use setTimeout to avoid state updates during radix-ui's internal render cycle
+              setTimeout(() => onUpdateRoute(route.id, { routeType: value }), 0);
+            }}
             disabled={isSaving}
           >
             <SelectTrigger className="h-9">
@@ -335,7 +341,10 @@ export function DesignProperties({
             <Label className="text-xs">Fiber Count</Label>
             <Select
               value={route.fiberCount?.toString() || "48"}
-              onValueChange={(value) => onUpdateRoute(route.id, { fiberCount: parseInt(value) })}
+              onValueChange={(value) => {
+                // Use setTimeout to avoid state updates during radix-ui's internal render cycle
+                setTimeout(() => onUpdateRoute(route.id, { fiberCount: parseInt(value) }), 0);
+              }}
               disabled={isSaving}
             >
               <SelectTrigger className="h-9">
