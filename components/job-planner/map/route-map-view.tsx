@@ -115,12 +115,13 @@ export function RouteMapView({
 
   // Sync layers from initialConfig when it changes (e.g., after API load)
   useEffect(() => {
-    if (initialConfig) {
+    if (initialConfig?.layers && initialConfig.layers.length > 0) {
+      const layers = initialConfig.layers;
       setMapConfig(prev => ({
         ...prev,
         center: initialConfig.center || prev.center,
-        zoom: initialConfig.zoom ?? prev.zoom,
-        layers: initialConfig.layers || prev.layers,
+        zoom: initialConfig.zoom || prev.zoom,
+        layers,
       }));
     }
   }, [initialConfig]);
