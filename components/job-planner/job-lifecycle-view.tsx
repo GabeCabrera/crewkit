@@ -116,6 +116,20 @@ export interface JobPlanData {
     userId: string;
     user: { id: string; name: string | null; email: string };
   }>;
+  // Map Data
+  mapCenter?: { lat: number; lng: number } | null;
+  mapZoom?: number | null;
+  mapLayers?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    fileUrl?: string | null;
+    geoJson?: Record<string, unknown> | null;
+    bounds?: [[number, number], [number, number]] | null;
+    opacity: number;
+    visible: boolean;
+    zIndex: number;
+  }>;
 }
 
 interface JobLifecycleViewProps {

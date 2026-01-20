@@ -95,6 +95,9 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         },
+        mapLayers: {
+          orderBy: { zIndex: "asc" },
+        },
       },
     });
 

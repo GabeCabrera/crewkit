@@ -389,11 +389,38 @@ model JobPlan {
   // Dynamic permits system
   permits             JobPermit[]
   
+  // ========== MAP DATA ==========
+  mapCenter           Json?     // { lat: number, lng: number }
+  mapZoom             Int?      // Default zoom level
+  mapLayers           JobMapLayer[]
+  
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   
   @@index([status])
   @@index([createdById])
+}
+
+// ============================================================
+// JOB MAP LAYERS
+// ============================================================
+
+model JobMapLayer {
+  id          String   @id @default(cuid())
+  jobPlanId   String
+  jobPlan     JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
+  name        String
+  type        String   // "kmz", "kml", "geojson", "image_overlay", "drawn"
+  fileUrl     String?  // Vercel Blob URL for uploaded files
+  geoJson     Json?    // Parsed GeoJSON data
+  bounds      Json?    // For image overlays: [[south, west], [north, east]]
+  opacity     Float    @default(1.0)
+  visible     Boolean  @default(true)
+  zIndex      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([jobPlanId])
 }
 
 // ============================================================
