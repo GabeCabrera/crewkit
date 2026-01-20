@@ -244,10 +244,10 @@ export async function DELETE(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Only admins and superusers can delete job plans
-    if (!["ADMIN", "SUPERUSER"].includes(user.role)) {
+    // Everyone except FIELD users can delete job plans
+    if (user.role === "FIELD") {
       return NextResponse.json(
-        { error: "Only admins can delete job plans" },
+        { error: "Field users cannot delete job plans" },
         { status: 403 }
       );
     }

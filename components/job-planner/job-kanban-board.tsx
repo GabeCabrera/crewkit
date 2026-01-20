@@ -211,7 +211,7 @@ export function JobKanbanBoard({
   const nameUpdateAbortRef = useRef<AbortController | null>(null);
 
   const canEdit = !viewOnly && !!session?.user?.role && ["MANAGER", "ADMIN", "SUPERUSER"].includes(session.user.role);
-  const canDelete = !viewOnly && !!session?.user?.role && ["ADMIN", "SUPERUSER"].includes(session.user.role);
+  const canDelete = !viewOnly && !!session?.user?.role && session.user.role !== "FIELD";
 
   const fetchJobs = useCallback(async () => {
     try {
