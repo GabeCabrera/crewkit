@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import {
   X,
@@ -17,6 +17,7 @@ import {
   Bug,
   Waves,
   Maximize2,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,7 @@ import {
 } from "@/components/ui/select";
 import { JobComments } from "./job-comments";
 import { cn } from "@/lib/utils";
-
-type JobPlanStatus = "DRAFT" | "READY" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+import { getAvailableStatusOptions, JobPlanStatus } from "@/lib/validations";
 
 interface Assignment {
   id: string;
@@ -72,6 +72,7 @@ interface JobPlanDetail {
   animalHazards: boolean;
   waterRailCrossing: boolean;
   foremanNotes: string | null;
+  plannedStartDate: string | null;
   status: JobPlanStatus;
   createdAt: string;
   updatedAt: string;
@@ -105,8 +106,27 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const canManage = session?.user?.role && ["MANAGER", "ADMIN", "SUPERUSER"].includes(session.user.role);
+
+  // Get available status options based on current job state
+  const availableStatuses = useMemo(() => {
+    if (!job) return [];
+    return getAvailableStatusOptions({
+      status: job.status,
+      rmpPermitApproved: job.rmpPermitApproved,
+      sesdPermitApproved: job.sesdPermitApproved,
+      makeReadyComplete: job.makeReadyComplete,
+      easementsClear: job.easementsClear,
+      jobName: job.jobName,
+      startPoleId: job.startPoleId,
+      endPoleId: job.endPoleId,
+      totalDistance: job.totalDistance,
+      plannedStartDate: job.plannedStartDate,
+      assignments: job.assignments,
+    });
+  }, [job]);
 
   const fetchJob = useCallback(async () => {
     try {
@@ -142,6 +162,7 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
   }, [fetchJob, fetchUsers, canManage]);
 
   const updateStatus = async (newStatus: JobPlanStatus) => {
+    setStatusError(null);
     try {
       const response = await fetch(`/api/job-plans/${jobId}`, {
         method: "PATCH",
@@ -152,9 +173,13 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       if (response.ok) {
         setJob((prev) => prev ? { ...prev, status: newStatus } : null);
         onUpdate?.();
+      } else {
+        const errorData = await response.json();
+        setStatusError(errorData.error || "Failed to update status");
       }
     } catch (error) {
       console.error("Error updating status:", error);
+      setStatusError("Failed to update status");
     }
   };
 
@@ -267,21 +292,43 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {statusOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex items-center gap-2">
-                        <Badge className={cn("font-normal", option.color)}>
-                          {option.label}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {statusOptions.map((option) => {
+                    const availability = availableStatuses.find(s => s.status === option.value);
+                    const isDisabled = availability ? !availability.available : false;
+                    
+                    return (
+                      <SelectItem 
+                        key={option.value}
+                        value={option.value} 
+                        disabled={isDisabled}
+                        className={cn(isDisabled && "opacity-50")}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Badge className={cn("font-normal", option.color)}>
+                            {option.label}
+                          </Badge>
+                          {isDisabled && (
+                            <Info className="h-3 w-3 text-slate-400" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             ) : (
               <Badge className={cn("mt-1", statusOptions.find(s => s.value === job.status)?.color)}>
                 {statusOptions.find(s => s.value === job.status)?.label}
               </Badge>
+            )}
+            {/* Status Error Message */}
+            {statusError && (
+              <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs text-red-600 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {statusError}
+                </p>
+              </div>
             )}
           </div>
 

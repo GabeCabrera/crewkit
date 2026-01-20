@@ -36,6 +36,12 @@ interface JobPlan {
   priority: JobPriority;
   plannedStartDate: string | null;
   plannedEndDate: string | null;
+  // Permits
+  rmpPermitApproved: boolean;
+  sesdPermitApproved: boolean;
+  makeReadyComplete: boolean;
+  easementsClear: boolean;
+  // Hazards
   trafficControl: boolean;
   treeTrimming: boolean;
   animalHazards: boolean;

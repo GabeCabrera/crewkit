@@ -2,15 +2,16 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Briefcase, Loader2 } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import { JobKanbanBoard } from "@/components/job-planner/job-kanban-board";
 import { JobDetailPanel } from "@/components/job-planner/job-detail-panel";
+import { JobCreationWizard } from "@/components/job-planner/job-creation-wizard";
 
 function JobsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Check for job query parameter
@@ -31,49 +32,19 @@ function JobsPageContent() {
     window.history.replaceState({}, "", "/admin/jobs");
   };
 
-  const handleCreateNew = async () => {
-    setIsCreating(true);
-    try {
-      const res = await fetch("/api/job-plans", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobName: `New Job - ${new Date().toLocaleDateString()}`,
-          startPoleId: "TBD",
-          endPoleId: "TBD",
-          totalDistance: 0,
-          strandFootage: 0,
-          fiberFootage: 0,
-        }),
-      });
-      
-      if (res.ok) {
-        const job = await res.json();
-        router.push(`/admin/jobs/${job.id}`);
-      } else {
-        console.error("Failed to create job");
-        setIsCreating(false);
-      }
-    } catch (error) {
-      console.error("Error creating job:", error);
-      setIsCreating(false);
-    }
+  const handleCreateNew = () => {
+    setWizardOpen(true);
+  };
+
+  const handleJobCreated = (jobId: string) => {
+    // Refresh the kanban board and navigate to the new job
+    setRefreshKey((prev) => prev + 1);
+    router.push(`/admin/jobs/${jobId}`);
   };
 
   const handleJobUpdated = () => {
     setRefreshKey((prev) => prev + 1);
   };
-
-  if (isCreating) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-          <p className="text-slate-500">Creating new job...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white -m-4 sm:-m-6 lg:-m-8">
@@ -111,6 +82,14 @@ function JobsPageContent() {
           basePath="/admin/jobs"
         />
       )}
+
+      {/* Job Creation Wizard */}
+      <JobCreationWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onSuccess={handleJobCreated}
+        basePath="/admin/jobs"
+      />
     </div>
   );
 }

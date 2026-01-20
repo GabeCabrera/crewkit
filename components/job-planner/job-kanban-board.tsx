@@ -73,6 +73,12 @@ interface JobPlan {
   priority: JobPriority;
   plannedStartDate: string | null;
   plannedEndDate: string | null;
+  // Permits
+  rmpPermitApproved: boolean;
+  sesdPermitApproved: boolean;
+  makeReadyComplete: boolean;
+  easementsClear: boolean;
+  // Hazards
   trafficControl: boolean;
   treeTrimming: boolean;
   animalHazards: boolean;
@@ -209,6 +215,10 @@ export function JobKanbanBoard({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<JobPlan | null>(null);
 
+  // Status transition error state
+  const [statusErrorDialogOpen, setStatusErrorDialogOpen] = useState(false);
+  const [statusErrorMessage, setStatusErrorMessage] = useState<string | null>(null);
+
   // View mode state (persisted in localStorage)
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
@@ -302,7 +312,10 @@ export function JobKanbanBoard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!response.ok) throw new Error("Failed to update status");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update status");
+      }
       return response.json();
     },
     onMutate: async ({ jobId, newStatus }) => {
@@ -321,7 +334,10 @@ export function JobKanbanBoard({
       if (context?.previousJobs) {
         queryClient.setQueryData(["jobs"], context.previousJobs);
       }
-      console.error("Error updating job status:", err);
+      // Show error dialog with validation message
+      const errorMessage = err instanceof Error ? err.message : "Failed to update status";
+      setStatusErrorMessage(errorMessage);
+      setStatusErrorDialogOpen(true);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
@@ -647,6 +663,26 @@ export function JobKanbanBoard({
               className="bg-red-500 hover:bg-red-600"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Status Transition Error Dialog */}
+      <AlertDialog open={statusErrorDialogOpen} onOpenChange={setStatusErrorDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Cannot Change Status
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-left">
+              {statusErrorMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setStatusErrorDialogOpen(false)}>
+              OK
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

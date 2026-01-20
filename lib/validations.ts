@@ -125,12 +125,15 @@ export const jobPlanStatusSchema = z.enum(["DRAFT", "READY", "IN_PROGRESS", "COM
 export const jobPrioritySchema = z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]);
 export const issueSeveritySchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 
+export type JobPlanStatus = z.infer<typeof jobPlanStatusSchema>;
+
+// Job Plan creation requires all permits to be verified
 export const createJobPlanSchema = z.object({
   // Route Details (required)
   jobName: z.string().min(1, "Job name is required").max(200, "Job name too long"),
   startPoleId: z.string().min(1, "Start pole ID is required").max(50, "Start pole ID too long"),
   endPoleId: z.string().min(1, "End pole ID is required").max(50, "End pole ID too long"),
-  totalDistance: z.number().min(0, "Distance must be positive"),
+  totalDistance: z.number().positive("Distance must be greater than 0"),
   
   // Materials (optional with defaults)
   strandFootage: z.number().min(0).optional(),
@@ -139,11 +142,11 @@ export const createJobPlanSchema = z.object({
   tangents: z.number().int().min(0).optional().default(0),
   anchors: z.number().int().min(0).optional().default(0),
   
-  // Permits (optional with defaults)
-  rmpPermitApproved: z.boolean().optional().default(false),
-  sesdPermitApproved: z.boolean().optional().default(false),
-  makeReadyComplete: z.boolean().optional().default(false),
-  easementsClear: z.boolean().optional().default(false),
+  // Permits (ALL REQUIRED to be true for job creation)
+  rmpPermitApproved: z.literal(true, { errorMap: () => ({ message: "RMP Permit must be approved" }) }),
+  sesdPermitApproved: z.literal(true, { errorMap: () => ({ message: "SESD Permit must be approved" }) }),
+  makeReadyComplete: z.literal(true, { errorMap: () => ({ message: "Make-Ready must be complete" }) }),
+  easementsClear: z.literal(true, { errorMap: () => ({ message: "Easements must be clear" }) }),
   
   // Hazards (optional with defaults)
   trafficControl: z.boolean().optional().default(false),
@@ -162,6 +165,178 @@ export const createJobPlanSchema = z.object({
   status: jobPlanStatusSchema.optional().default("DRAFT"),
   priority: jobPrioritySchema.optional().default("MEDIUM"),
 });
+
+// ==========================================
+// Job Status Transition Validation
+// ==========================================
+
+// Type for job data used in status transition validation
+export interface JobForStatusValidation {
+  status: JobPlanStatus;
+  rmpPermitApproved: boolean;
+  sesdPermitApproved: boolean;
+  makeReadyComplete: boolean;
+  easementsClear: boolean;
+  jobName: string;
+  startPoleId: string;
+  endPoleId: string;
+  totalDistance: number;
+  plannedStartDate: string | Date | null;
+  assignments?: { id: string }[];
+}
+
+// Check if all permits are verified
+export function hasAllPermitsVerified(job: JobForStatusValidation): boolean {
+  return (
+    job.rmpPermitApproved &&
+    job.sesdPermitApproved &&
+    job.makeReadyComplete &&
+    job.easementsClear
+  );
+}
+
+// Check if route details are complete
+export function hasRouteComplete(job: JobForStatusValidation): boolean {
+  return (
+    !!job.jobName &&
+    job.jobName.trim() !== "" &&
+    !!job.startPoleId &&
+    job.startPoleId.trim() !== "" &&
+    !!job.endPoleId &&
+    job.endPoleId.trim() !== "" &&
+    job.totalDistance > 0
+  );
+}
+
+// Check if crew is assigned
+export function hasCrewAssigned(job: JobForStatusValidation): boolean {
+  return Array.isArray(job.assignments) && job.assignments.length > 0;
+}
+
+// Check if job is scheduled
+export function hasSchedule(job: JobForStatusValidation): boolean {
+  return job.plannedStartDate != null;
+}
+
+// Validation result type
+export interface StatusTransitionResult {
+  valid: boolean;
+  error?: string;
+  missingRequirements?: string[];
+}
+
+// Validate status transition
+export function validateStatusTransition(
+  job: JobForStatusValidation,
+  newStatus: JobPlanStatus
+): StatusTransitionResult {
+  const currentStatus = job.status;
+  
+  // Same status - always allowed
+  if (currentStatus === newStatus) {
+    return { valid: true };
+  }
+
+  // CANCELLED - allowed from DRAFT or READY
+  if (newStatus === "CANCELLED") {
+    if (currentStatus === "DRAFT" || currentStatus === "READY") {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      error: "Can only cancel jobs that are in Draft or Ready status",
+    };
+  }
+
+  // COMPLETED - only from IN_PROGRESS
+  if (newStatus === "COMPLETED") {
+    if (currentStatus === "IN_PROGRESS") {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      error: "Can only complete jobs that are In Progress",
+    };
+  }
+
+  // READY - requires permits + route
+  if (newStatus === "READY") {
+    const missing: string[] = [];
+    
+    if (!hasAllPermitsVerified(job)) {
+      missing.push("All permits must be verified");
+    }
+    if (!hasRouteComplete(job)) {
+      missing.push("Route details must be complete (name, poles, distance)");
+    }
+    
+    if (missing.length > 0) {
+      return {
+        valid: false,
+        error: `Cannot move to Ready: ${missing.join(", ")}`,
+        missingRequirements: missing,
+      };
+    }
+    return { valid: true };
+  }
+
+  // IN_PROGRESS - requires READY status + crew + schedule
+  if (newStatus === "IN_PROGRESS") {
+    const missing: string[] = [];
+    
+    // Must come from READY status
+    if (currentStatus !== "READY") {
+      missing.push("Job must be in Ready status first");
+    }
+    
+    if (!hasCrewAssigned(job)) {
+      missing.push("At least one crew member must be assigned");
+    }
+    if (!hasSchedule(job)) {
+      missing.push("Start date must be scheduled");
+    }
+    
+    if (missing.length > 0) {
+      return {
+        valid: false,
+        error: `Cannot move to In Progress: ${missing.join(", ")}`,
+        missingRequirements: missing,
+      };
+    }
+    return { valid: true };
+  }
+
+  // DRAFT - going back to draft (only from READY)
+  if (newStatus === "DRAFT") {
+    if (currentStatus === "READY") {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      error: "Can only move back to Draft from Ready status",
+    };
+  }
+
+  return { valid: false, error: "Invalid status transition" };
+}
+
+// Get available status options for a job
+export function getAvailableStatusOptions(job: JobForStatusValidation): {
+  status: JobPlanStatus;
+  available: boolean;
+  reason?: string;
+}[] {
+  const statuses: JobPlanStatus[] = ["DRAFT", "READY", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+  
+  return statuses.map((status) => {
+    const result = validateStatusTransition(job, status);
+    return {
+      status,
+      available: result.valid,
+      reason: result.error,
+    };
+  });
+}
 
 export const updateJobPlanSchema = z.object({
   // Route Details

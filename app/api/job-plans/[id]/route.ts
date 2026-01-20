@@ -3,7 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeRateLimit } from "@/lib/rate-limit";
-import { updateJobPlanSchema, validateRequest } from "@/lib/validations";
+import { 
+  updateJobPlanSchema, 
+  validateRequest, 
+  validateStatusTransition,
+  JobPlanStatus,
+} from "@/lib/validations";
 
 export const dynamic = 'force-dynamic';
 
@@ -122,8 +127,14 @@ export async function PATCH(
       );
     }
 
+    // Fetch existing plan with assignments for status validation
     const existingPlan = await prisma.jobPlan.findUnique({
       where: { id },
+      include: {
+        assignments: {
+          select: { id: true },
+        },
+      },
     });
 
     if (!existingPlan) {
@@ -157,23 +168,34 @@ export async function PATCH(
       }
     }
 
-    // Auto-status logic
-    // Get current state with pending updates applied
-    const mergedState = { ...existingPlan, ...updateData };
-    
-    // Check if all permits are now complete
-    const allPermitsComplete = 
-      mergedState.rmpPermitApproved && 
-      mergedState.sesdPermitApproved && 
-      mergedState.makeReadyComplete && 
-      mergedState.easementsClear;
+    // Get current state with pending updates applied for validation
+    const mergedState = { 
+      ...existingPlan, 
+      ...updateData,
+      // Ensure assignments are available for validation
+      assignments: existingPlan.assignments,
+    };
 
-    // Auto-update status to READY when all permits checked (only if currently DRAFT)
-    if (allPermitsComplete && existingPlan.status === "DRAFT" && !body.status) {
-      updateData.status = "READY";
+    // Validate status transition if status is being changed
+    if (body.status && body.status !== existingPlan.status) {
+      const transitionResult = validateStatusTransition(
+        mergedState,
+        body.status as JobPlanStatus
+      );
+      
+      if (!transitionResult.valid) {
+        return NextResponse.json(
+          { 
+            error: transitionResult.error,
+            missingRequirements: transitionResult.missingRequirements,
+          },
+          { status: 400 }
+        );
+      }
     }
 
-    // Auto-update status to COMPLETED when signed off
+    // Auto-status logic for sign-off completion
+    // Auto-update status to COMPLETED when signed off (only if currently IN_PROGRESS)
     if (body.foremanSignoff === true && existingPlan.status === "IN_PROGRESS" && !body.status) {
       updateData.status = "COMPLETED";
     }
