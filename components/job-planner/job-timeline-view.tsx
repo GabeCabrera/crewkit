@@ -89,7 +89,7 @@ export function JobTimelineView({
     return today;
   });
   const [collapsedGroups, setCollapsedGroups] = useState<Set<JobPlanStatus>>(
-    new Set(["COMPLETED", "CANCELLED"])
+    () => new Set<JobPlanStatus>(["COMPLETED", "CANCELLED"])
   );
   const timelineRef = useRef<HTMLDivElement>(null);
 
