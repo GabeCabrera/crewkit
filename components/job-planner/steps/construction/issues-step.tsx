@@ -208,39 +208,41 @@ export function IssuesStep({ job, refreshJob, canEdit }: IssuesStepProps) {
   const openIssues = logs.filter((l) => !l.resolved);
   const resolvedIssues = logs.filter((l) => l.resolved);
 
+  const highPriorityCount = logs.filter((l) => l.severity === "HIGH" && !l.resolved).length;
+
   return (
     <div className="space-y-6">
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-red-50 rounded-xl p-4 text-center">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center transition-all duration-200">
           <p className="text-2xl font-bold text-red-600">
-            {logs.filter((l) => l.severity === "HIGH" && !l.resolved).length}
+            {highPriorityCount}
           </p>
-          <p className="text-xs text-red-600">High Priority</p>
+          <p className="text-xs font-medium text-red-600/80">High Priority</p>
         </div>
-        <div className="bg-amber-50 rounded-xl p-4 text-center">
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-center transition-all duration-200">
           <p className="text-2xl font-bold text-amber-600">
             {openIssues.length}
           </p>
-          <p className="text-xs text-amber-600">Open Issues</p>
+          <p className="text-xs font-medium text-amber-600/80">Open Issues</p>
         </div>
-        <div className="bg-emerald-50 rounded-xl p-4 text-center">
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center transition-all duration-200">
           <p className="text-2xl font-bold text-emerald-600">
             {resolvedIssues.length}
           </p>
-          <p className="text-xs text-emerald-600">Resolved</p>
+          <p className="text-xs font-medium text-emerald-600/80">Resolved</p>
         </div>
       </div>
 
       {/* Add New Issue */}
       {canEdit && (
-        <div className="border border-slate-200 rounded-xl p-4">
-          <h3 className="text-sm font-medium text-slate-700 mb-4">Report Issue</h3>
+        <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Report New Issue</h3>
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Date</Label>
+                <Label className="text-slate-600">Date</Label>
                 <DatePicker
                   date={date}
                   onDateChange={(d) => d && setDate(d)}
@@ -249,12 +251,12 @@ export function IssuesStep({ job, refreshJob, canEdit }: IssuesStepProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Severity</Label>
+                <Label className="text-slate-600">Severity</Label>
                 <Select
                   value={severity}
                   onValueChange={(v) => setSeverity(v as typeof severity)}
                 >
-                  <SelectTrigger className="h-12 rounded-xl">
+                  <SelectTrigger className="h-12 rounded-xl bg-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -282,13 +284,13 @@ export function IssuesStep({ job, refreshJob, canEdit }: IssuesStepProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
+              <Label htmlFor="description" className="text-slate-600">Description *</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Describe the issue or blocker..."
-                className="rounded-xl"
+                className="rounded-xl bg-white resize-none"
                 rows={3}
               />
             </div>
@@ -296,7 +298,7 @@ export function IssuesStep({ job, refreshJob, canEdit }: IssuesStepProps) {
             <Button
               onClick={handleAdd}
               disabled={isAdding || !description.trim()}
-              className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600"
+              className="w-full h-12 rounded-xl bg-red-500 hover:bg-red-600 transition-colors"
             >
               {isAdding ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />

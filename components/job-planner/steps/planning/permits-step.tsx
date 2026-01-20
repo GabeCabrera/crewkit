@@ -23,19 +23,35 @@ export function PermitsStep({ job, updateJob, canEdit }: PermitsStepProps) {
 
   return (
     <div className="space-y-6">
-      {!allChecked && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span className="font-medium">STOP: Job not ready. All items must be checked.</span>
+      {/* Status banner with smooth color/content transition */}
+      <div
+        className={cn(
+          "flex items-center gap-2 px-4 py-3 rounded-xl text-sm transition-all duration-300 ease-out",
+          allChecked
+            ? "text-emerald-600 bg-emerald-50"
+            : "text-red-600 bg-red-50"
+        )}
+      >
+        <div className="relative h-4 w-4 shrink-0">
+          <AlertCircle
+            className={cn(
+              "h-4 w-4 absolute inset-0 transition-opacity duration-300",
+              allChecked ? "opacity-0" : "opacity-100"
+            )}
+          />
+          <CheckCircle2
+            className={cn(
+              "h-4 w-4 absolute inset-0 transition-opacity duration-300",
+              allChecked ? "opacity-100" : "opacity-0"
+            )}
+          />
         </div>
-      )}
-
-      {allChecked && (
-        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-3 rounded-xl text-sm">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span className="font-medium">All permits verified. Job is ready to proceed.</span>
-        </div>
-      )}
+        <span className="font-medium">
+          {allChecked
+            ? "All permits verified. Job is ready to proceed."
+            : "STOP: Job not ready. All items must be checked."}
+        </span>
+      </div>
 
       <div className="space-y-3">
         {checks.map((check) => (
@@ -54,9 +70,14 @@ export function PermitsStep({ job, updateJob, canEdit }: PermitsStepProps) {
               }
             />
             <span className="font-medium text-slate-700">{check.label}</span>
-            {check.checked && (
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 ml-auto" />
-            )}
+            <CheckCircle2
+              className={cn(
+                "h-5 w-5 ml-auto transition-all duration-200",
+                check.checked
+                  ? "text-emerald-500 opacity-100 scale-100"
+                  : "text-transparent opacity-0 scale-75"
+              )}
+            />
           </label>
         ))}
       </div>

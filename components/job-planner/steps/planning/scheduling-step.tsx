@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Calendar, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
 
 interface SchedulingStepProps {
@@ -93,48 +94,53 @@ export function SchedulingStep({ job, updateJob, canEdit }: SchedulingStepProps)
         </div>
       </div>
 
-      {/* Summary */}
-      {(startDate || endDate || job.estimatedDuration) && (
-        <div className="bg-blue-50 rounded-xl p-4">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">Schedule Summary</h4>
-          <div className="space-y-1 text-sm text-blue-700">
-            {startDate && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>
-                  Start: {startDate.toLocaleDateString("en-US", { 
-                    weekday: "long", 
-                    month: "long", 
-                    day: "numeric",
-                    year: "numeric"
-                  })}
-                </span>
-              </div>
-            )}
-            {endDate && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>
-                  End: {endDate.toLocaleDateString("en-US", { 
-                    weekday: "long", 
-                    month: "long", 
-                    day: "numeric",
-                    year: "numeric"
-                  })}
-                </span>
-              </div>
-            )}
-            {job.estimatedDuration && (
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span>
-                  Estimated: {job.estimatedDuration} {job.durationUnit || "hours"}
-                </span>
-              </div>
-            )}
-          </div>
+      {/* Summary - animated expand/collapse */}
+      <div
+        className={cn(
+          "rounded-xl overflow-hidden transition-all duration-200 ease-out",
+          (startDate || endDate || job.estimatedDuration)
+            ? "bg-blue-50 p-4 opacity-100 max-h-60"
+            : "bg-transparent p-0 opacity-0 max-h-0"
+        )}
+      >
+        <h4 className="text-sm font-medium text-blue-800 mb-2">Schedule Summary</h4>
+        <div className="space-y-1 text-sm text-blue-700">
+          {startDate && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>
+                Start: {startDate.toLocaleDateString("en-US", { 
+                  weekday: "long", 
+                  month: "long", 
+                  day: "numeric",
+                  year: "numeric"
+                })}
+              </span>
+            </div>
+          )}
+          {endDate && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              <span>
+                End: {endDate.toLocaleDateString("en-US", { 
+                  weekday: "long", 
+                  month: "long", 
+                  day: "numeric",
+                  year: "numeric"
+                })}
+              </span>
+            </div>
+          )}
+          {job.estimatedDuration && (
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span>
+                Estimated: {job.estimatedDuration} {job.durationUnit || "hours"}
+              </span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <p className="text-sm text-slate-500">
         Scheduling helps with resource planning and team coordination. 

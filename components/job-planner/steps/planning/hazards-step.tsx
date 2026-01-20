@@ -25,23 +25,29 @@ export function HazardsStep({ job, updateJob, canEdit }: HazardsStepProps) {
 
   return (
     <div className="space-y-6">
-      {activeHazards.length > 0 && (
-        <div className="bg-amber-50 rounded-xl p-4">
-          <p className="text-sm font-medium text-amber-800 mb-2">
-            {activeHazards.length} hazard{activeHazards.length !== 1 ? "s" : ""} identified
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {activeHazards.map((hazard) => (
-              <span
-                key={hazard.id}
-                className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium"
-              >
-                {hazard.label}
-              </span>
-            ))}
-          </div>
+      {/* Animated hazards summary banner - always rendered, animates in/out */}
+      <div
+        className={cn(
+          "rounded-xl overflow-hidden transition-all duration-200 ease-out",
+          activeHazards.length > 0
+            ? "bg-amber-50 p-4 opacity-100 max-h-40"
+            : "bg-transparent p-0 opacity-0 max-h-0"
+        )}
+      >
+        <p className="text-sm font-medium text-amber-800 mb-2">
+          {activeHazards.length} hazard{activeHazards.length !== 1 ? "s" : ""} identified
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {activeHazards.map((hazard) => (
+            <span
+              key={hazard.id}
+              className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium"
+            >
+              {hazard.label}
+            </span>
+          ))}
         </div>
-      )}
+      </div>
 
       <div className="space-y-3">
         {hazards.map((hazard) => {

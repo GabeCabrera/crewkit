@@ -38,36 +38,61 @@ export function SignoffStep({ job, updateJob, canEdit }: SignoffStepProps) {
 
   return (
     <div className="space-y-6">
-      {/* Sign-off Status */}
-      {job.foremanSignoff ? (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
-          <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
-          <h3 className="text-xl font-semibold text-emerald-900 mb-1">
-            Job Signed Off
-          </h3>
-          <p className="text-emerald-700">
-            Completed on{" "}
-            {job.signoffDate
-              ? new Date(job.signoffDate).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })
-              : "N/A"}
-          </p>
+      {/* Sign-off Status - smooth transition between states */}
+      <div
+        className={cn(
+          "rounded-2xl p-6 text-center border transition-all duration-300 ease-out",
+          job.foremanSignoff
+            ? "bg-emerald-50 border-emerald-200"
+            : "bg-amber-50 border-amber-200"
+        )}
+      >
+        <div className="relative h-12 w-12 mx-auto mb-3">
+          <CheckCircle2
+            className={cn(
+              "h-12 w-12 absolute inset-0 transition-all duration-300",
+              job.foremanSignoff
+                ? "text-emerald-500 opacity-100 scale-100"
+                : "text-emerald-500 opacity-0 scale-75"
+            )}
+          />
+          <CheckSquare
+            className={cn(
+              "h-12 w-12 absolute inset-0 transition-all duration-300",
+              job.foremanSignoff
+                ? "text-amber-500 opacity-0 scale-75"
+                : "text-amber-500 opacity-100 scale-100"
+            )}
+          />
         </div>
-      ) : (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
-          <CheckSquare className="h-12 w-12 text-amber-500 mx-auto mb-3" />
-          <h3 className="text-xl font-semibold text-amber-900 mb-1">
-            Awaiting Sign-off
-          </h3>
-          <p className="text-amber-700">
-            Review requirements below before signing off
-          </p>
-        </div>
-      )}
+        <h3
+          className={cn(
+            "text-xl font-semibold mb-1 transition-colors duration-300",
+            job.foremanSignoff ? "text-emerald-900" : "text-amber-900"
+          )}
+        >
+          {job.foremanSignoff ? "Job Signed Off" : "Awaiting Sign-off"}
+        </h3>
+        <p
+          className={cn(
+            "transition-colors duration-300",
+            job.foremanSignoff ? "text-emerald-700" : "text-amber-700"
+          )}
+        >
+          {job.foremanSignoff
+            ? `Completed on ${
+                job.signoffDate
+                  ? new Date(job.signoffDate).toLocaleDateString("en-US", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })
+                  : "N/A"
+              }`
+            : "Review requirements below before signing off"}
+        </p>
+      </div>
 
       {/* Requirements Checklist */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
