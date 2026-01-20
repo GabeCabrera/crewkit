@@ -59,6 +59,7 @@ model User {
   createdAssignments JobAssignment[] @relation("AssignmentCreator")
   comments          Comment[]
   notifications     Notification[]
+  permitDocuments   PermitDocument[] @relation("DocumentUploader")
 }
 
 model Team {
@@ -385,6 +386,9 @@ model JobPlan {
   crewHoursLogs       CrewHoursLog[]
   issueLogs           IssueLog[]
   
+  // Dynamic permits system
+  permits             JobPermit[]
+  
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   
@@ -524,4 +528,49 @@ model Notification {
   
   @@index([userId, isRead])
   @@index([createdAt])
+}
+
+// ============================================================
+// DYNAMIC PERMITS SYSTEM
+// ============================================================
+
+model PermitType {
+  id          String      @id @default(cuid())
+  name        String      @unique
+  description String?
+  isDefault   Boolean     @default(false)  // System defaults can't be deleted
+  isArchived  Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  permits     JobPermit[]
+}
+
+model JobPermit {
+  id            String           @id @default(cuid())
+  jobPlanId     String
+  jobPlan       JobPlan          @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
+  permitTypeId  String
+  permitType    PermitType       @relation(fields: [permitTypeId], references: [id])
+  isApproved    Boolean          @default(false)
+  notes         String?
+  documents     PermitDocument[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  
+  @@unique([jobPlanId, permitTypeId])
+  @@index([jobPlanId])
+}
+
+model PermitDocument {
+  id           String    @id @default(cuid())
+  jobPermitId  String
+  jobPermit    JobPermit @relation(fields: [jobPermitId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileType     String    // "application/pdf", "image/jpeg", etc.
+  fileSize     Int       // bytes
+  uploadedById String
+  uploadedBy   User      @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  uploadedAt   DateTime  @default(now())
+  
+  @@index([jobPermitId])
 }

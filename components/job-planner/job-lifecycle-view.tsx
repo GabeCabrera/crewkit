@@ -39,13 +39,38 @@ import { SignoffStep } from "./steps/reporting/signoff-step";
 import { LessonsStep } from "./steps/reporting/lessons-step";
 import { HoursSummaryStep } from "./steps/reporting/hours-summary-step";
 
+// Type for permit documents
+interface PermitDocument {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  uploadedAt: string;
+}
+
+// Type for job permits
+interface JobPermit {
+  id: string;
+  isApproved: boolean;
+  notes: string | null;
+  permitType: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
+  documents: PermitDocument[];
+}
+
 export interface JobPlanData {
   id: string;
-  // Planning - Permits
+  // Planning - Permits (legacy fields for backwards compatibility)
   rmpPermitApproved: boolean;
   sesdPermitApproved: boolean;
   makeReadyComplete: boolean;
   easementsClear: boolean;
+  // Dynamic permits
+  permits?: JobPermit[];
   // Planning - Route
   jobName: string;
   startPoleId: string;

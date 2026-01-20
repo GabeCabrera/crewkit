@@ -52,6 +52,24 @@ export async function GET(
             },
           },
         },
+        permits: {
+          include: {
+            permitType: true,
+            documents: {
+              include: {
+                uploadedBy: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+              orderBy: { uploadedAt: "desc" },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
         comments: {
           where: { parentId: null }, // Only top-level comments
           include: {
@@ -127,12 +145,15 @@ export async function PATCH(
       );
     }
 
-    // Fetch existing plan with assignments for status validation
+    // Fetch existing plan with assignments and permits for status validation
     const existingPlan = await prisma.jobPlan.findUnique({
       where: { id },
       include: {
         assignments: {
           select: { id: true },
+        },
+        permits: {
+          select: { id: true, isApproved: true },
         },
       },
     });
@@ -172,8 +193,9 @@ export async function PATCH(
     const mergedState = { 
       ...existingPlan, 
       ...updateData,
-      // Ensure assignments are available for validation
+      // Ensure assignments and permits are available for validation
       assignments: existingPlan.assignments,
+      permits: existingPlan.permits,
     };
 
     // Validate status transition if status is being changed
@@ -223,6 +245,22 @@ export async function PATCH(
                 id: true,
                 name: true,
                 email: true,
+              },
+            },
+          },
+        },
+        permits: {
+          include: {
+            permitType: true,
+            documents: {
+              include: {
+                uploadedBy: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
               },
             },
           },

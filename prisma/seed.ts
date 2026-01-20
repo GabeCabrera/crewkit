@@ -78,11 +78,34 @@ async function main() {
     },
   });
 
+  // Create default permit types
+  const defaultPermitTypes = [
+    { name: "RMP Permit", description: "Right of Way Management Permit", isDefault: true },
+    { name: "SESD Permit", description: "State Environmental Services Division Permit", isDefault: true },
+    { name: "Make-Ready", description: "Make-Ready work completion verification", isDefault: true },
+    { name: "Easements", description: "Easement clearance verification", isDefault: true },
+    { name: "DOT Permit", description: "Department of Transportation Permit", isDefault: true },
+    { name: "Railroad Crossing", description: "Railroad crossing permit", isDefault: true },
+    { name: "County Permit", description: "County-level permit", isDefault: true },
+    { name: "City Permit", description: "City-level permit", isDefault: true },
+  ];
+
+  const createdPermitTypes = [];
+  for (const permitType of defaultPermitTypes) {
+    const created = await prisma.permitType.upsert({
+      where: { name: permitType.name },
+      update: {},
+      create: permitType,
+    });
+    createdPermitTypes.push(created.name);
+  }
+
   console.log('Seed data created:');
   console.log('- Admin:', admin.email);
   console.log('- Manager:', manager.email);
   console.log('- Field:', field.email);
   console.log('- Equipment:', equipment1.name, equipment2.name);
+  console.log('- Permit Types:', createdPermitTypes.join(', '));
 }
 
 main()

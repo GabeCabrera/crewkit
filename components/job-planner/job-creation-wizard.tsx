@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -15,6 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ClipboardCheck,
   MapPin,
   CheckCircle2,
@@ -22,6 +29,9 @@ import {
   ArrowRight,
   ArrowLeft,
   Loader2,
+  Plus,
+  X,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,36 +42,32 @@ interface JobCreationWizardProps {
   basePath?: string;
 }
 
-interface WizardData {
-  // Step 1 - Permits
-  rmpPermitApproved: boolean;
-  sesdPermitApproved: boolean;
-  makeReadyComplete: boolean;
-  easementsClear: boolean;
-  // Step 2 - Route
+interface PermitType {
+  id: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+}
+
+interface SelectedPermit {
+  permitTypeId: string;
+  permitTypeName: string;
+  isApproved: boolean;
+}
+
+interface RouteData {
   jobName: string;
   startPoleId: string;
   endPoleId: string;
   totalDistance: number;
 }
 
-const initialData: WizardData = {
-  rmpPermitApproved: false,
-  sesdPermitApproved: false,
-  makeReadyComplete: false,
-  easementsClear: false,
+const initialRouteData: RouteData = {
   jobName: "",
   startPoleId: "",
   endPoleId: "",
   totalDistance: 0,
 };
-
-const permitChecks = [
-  { id: "rmpPermitApproved", label: "RMP Permit Approved" },
-  { id: "sesdPermitApproved", label: "SESD Permit Approved" },
-  { id: "makeReadyComplete", label: "Make-Ready Complete" },
-  { id: "easementsClear", label: "Easements Clear" },
-] as const;
 
 export function JobCreationWizard({
   open,
@@ -71,33 +77,121 @@ export function JobCreationWizard({
 }: JobCreationWizardProps) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
-  const [data, setData] = useState<WizardData>(initialData);
+  const [routeData, setRouteData] = useState<RouteData>(initialRouteData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Validation
-  const allPermitsChecked =
-    data.rmpPermitApproved &&
-    data.sesdPermitApproved &&
-    data.makeReadyComplete &&
-    data.easementsClear;
+  // Permits state
+  const [permitTypes, setPermitTypes] = useState<PermitType[]>([]);
+  const [selectedPermits, setSelectedPermits] = useState<SelectedPermit[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+  const [customTypeName, setCustomTypeName] = useState("");
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(true);
 
-  const routeComplete =
-    data.jobName.trim() !== "" &&
-    data.startPoleId.trim() !== "" &&
-    data.endPoleId.trim() !== "" &&
-    data.totalDistance > 0;
+  // Fetch permit types when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchPermitTypes();
+    }
+  }, [open]);
 
-  const canProceedToStep2 = allPermitsChecked;
-  const canSubmit = allPermitsChecked && routeComplete;
-
-  // Handlers
-  const handlePermitChange = (id: keyof WizardData, checked: boolean) => {
-    setData((prev) => ({ ...prev, [id]: checked }));
+  const fetchPermitTypes = async () => {
+    setIsLoadingTypes(true);
+    try {
+      const response = await fetch("/api/permit-types");
+      if (response.ok) {
+        const data = await response.json();
+        setPermitTypes(data);
+        
+        // Auto-add default permit types
+        const defaults = data.filter((t: PermitType) => t.isDefault);
+        setSelectedPermits(
+          defaults.map((t: PermitType) => ({
+            permitTypeId: t.id,
+            permitTypeName: t.name,
+            isApproved: false,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching permit types:", error);
+    } finally {
+      setIsLoadingTypes(false);
+    }
   };
 
-  const handleRouteChange = (field: keyof WizardData, value: string | number) => {
-    setData((prev) => ({ ...prev, [field]: value }));
+  // Validation
+  const allPermitsApproved = selectedPermits.length > 0 && selectedPermits.every((p) => p.isApproved);
+  const hasAtLeastOnePermit = selectedPermits.length > 0;
+
+  const routeComplete =
+    routeData.jobName.trim() !== "" &&
+    routeData.startPoleId.trim() !== "" &&
+    routeData.endPoleId.trim() !== "" &&
+    routeData.totalDistance > 0;
+
+  const canProceedToStep2 = hasAtLeastOnePermit && allPermitsApproved;
+  const canSubmit = canProceedToStep2 && routeComplete;
+
+  // Get available permit types (not already selected)
+  const availableTypes = permitTypes.filter(
+    (type) => !selectedPermits.some((p) => p.permitTypeId === type.id)
+  );
+
+  // Handlers
+  const handleAddPermit = () => {
+    if (!selectedTypeId) return;
+
+    const type = permitTypes.find((t) => t.id === selectedTypeId);
+    if (type) {
+      setSelectedPermits((prev) => [
+        ...prev,
+        { permitTypeId: type.id, permitTypeName: type.name, isApproved: false },
+      ]);
+      setSelectedTypeId("");
+    }
+  };
+
+  const handleCreateCustomType = async () => {
+    if (!customTypeName.trim()) return;
+
+    try {
+      const response = await fetch("/api/permit-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: customTypeName.trim() }),
+      });
+
+      if (response.ok) {
+        const newType = await response.json();
+        setPermitTypes((prev) => [...prev, newType]);
+        setSelectedPermits((prev) => [
+          ...prev,
+          { permitTypeId: newType.id, permitTypeName: newType.name, isApproved: false },
+        ]);
+        setCustomTypeName("");
+        setIsAddingCustom(false);
+      }
+    } catch (error) {
+      console.error("Error creating custom permit type:", error);
+    }
+  };
+
+  const handleRemovePermit = (permitTypeId: string) => {
+    setSelectedPermits((prev) => prev.filter((p) => p.permitTypeId !== permitTypeId));
+  };
+
+  const handleToggleApproval = (permitTypeId: string) => {
+    setSelectedPermits((prev) =>
+      prev.map((p) =>
+        p.permitTypeId === permitTypeId ? { ...p, isApproved: !p.isApproved } : p
+      )
+    );
+  };
+
+  const handleRouteChange = (field: keyof RouteData, value: string | number) => {
+    setRouteData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleNext = () => {
@@ -113,7 +207,11 @@ export function JobCreationWizard({
   const handleClose = () => {
     // Reset state when closing
     setStep(1);
-    setData(initialData);
+    setRouteData(initialRouteData);
+    setSelectedPermits([]);
+    setSelectedTypeId("");
+    setCustomTypeName("");
+    setIsAddingCustom(false);
     setError(null);
     onOpenChange(false);
   };
@@ -125,37 +223,52 @@ export function JobCreationWizard({
     setError(null);
 
     try {
-      const response = await fetch("/api/job-plans", {
+      // Step 1: Create the job
+      const jobResponse = await fetch("/api/job-plans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Permits
-          rmpPermitApproved: data.rmpPermitApproved,
-          sesdPermitApproved: data.sesdPermitApproved,
-          makeReadyComplete: data.makeReadyComplete,
-          easementsClear: data.easementsClear,
-          // Route
-          jobName: data.jobName.trim(),
-          startPoleId: data.startPoleId.trim(),
-          endPoleId: data.endPoleId.trim(),
-          totalDistance: data.totalDistance,
-          // Auto-calculate materials from distance
-          strandFootage: data.totalDistance,
-          fiberFootage: Math.round(data.totalDistance * 1.1),
+          jobName: routeData.jobName.trim(),
+          startPoleId: routeData.startPoleId.trim(),
+          endPoleId: routeData.endPoleId.trim(),
+          totalDistance: routeData.totalDistance,
+          strandFootage: routeData.totalDistance,
+          fiberFootage: Math.round(routeData.totalDistance * 1.1),
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!jobResponse.ok) {
+        const errorData = await jobResponse.json();
         throw new Error(errorData.error || "Failed to create job");
       }
 
-      const job = await response.json();
+      const job = await jobResponse.json();
+
+      // Step 2: Add permits to the job
+      for (const permit of selectedPermits) {
+        // Add permit
+        const addResponse = await fetch(`/api/job-plans/${job.id}/permits`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ permitTypeId: permit.permitTypeId }),
+        });
+
+        if (addResponse.ok) {
+          const addedPermit = await addResponse.json();
+          
+          // Update approval status if approved
+          if (permit.isApproved) {
+            await fetch(`/api/job-plans/${job.id}/permits?permitId=${addedPermit.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ isApproved: true }),
+            });
+          }
+        }
+      }
 
       // Reset wizard state
-      setStep(1);
-      setData(initialData);
-      onOpenChange(false);
+      handleClose();
 
       // Callback or navigate
       if (onSuccess) {
@@ -172,7 +285,7 @@ export function JobCreationWizard({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {step === 1 ? (
@@ -189,7 +302,7 @@ export function JobCreationWizard({
           </DialogTitle>
           <DialogDescription>
             {step === 1
-              ? "Verify all permits and prerequisites before creating the job."
+              ? "Add and verify all required permits before creating the job."
               : "Enter the job route information."}
           </DialogDescription>
         </DialogHeader>
@@ -201,12 +314,12 @@ export function JobCreationWizard({
               "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors",
               step === 1
                 ? "bg-orange-500 text-white"
-                : allPermitsChecked
+                : allPermitsApproved
                 ? "bg-emerald-500 text-white"
                 : "bg-slate-200 text-slate-600"
             )}
           >
-            {allPermitsChecked && step === 2 ? (
+            {allPermitsApproved && step === 2 ? (
               <CheckCircle2 className="h-4 w-4" />
             ) : (
               "1"
@@ -247,50 +360,145 @@ export function JobCreationWizard({
             <div
               className={cn(
                 "flex items-center gap-2 px-4 py-3 rounded-xl text-sm transition-all duration-300",
-                allPermitsChecked
+                !hasAtLeastOnePermit
+                  ? "text-amber-600 bg-amber-50"
+                  : allPermitsApproved
                   ? "text-emerald-600 bg-emerald-50"
-                  : "text-amber-600 bg-amber-50"
+                  : "text-red-600 bg-red-50"
               )}
             >
-              {allPermitsChecked ? (
+              {allPermitsApproved ? (
                 <CheckCircle2 className="h-4 w-4" />
               ) : (
                 <AlertCircle className="h-4 w-4" />
               )}
               <span className="font-medium">
-                {allPermitsChecked
+                {!hasAtLeastOnePermit
+                  ? "Add at least one permit to continue."
+                  : allPermitsApproved
                   ? "All permits verified. Ready to proceed."
-                  : "All items must be checked to continue."}
+                  : `${selectedPermits.filter((p) => p.isApproved).length} of ${selectedPermits.length} permits approved.`}
               </span>
             </div>
 
-            {/* Permit Checkboxes */}
-            <div className="space-y-2">
-              {permitChecks.map((check) => (
-                <label
-                  key={check.id}
-                  className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors"
-                >
-                  <Checkbox
-                    checked={data[check.id]}
-                    onCheckedChange={(checked) =>
-                      handlePermitChange(check.id, checked === true)
-                    }
+            {/* Add Permit Section */}
+            <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+              <label className="text-xs font-medium text-slate-500">Add Permit</label>
+              {!isAddingCustom ? (
+                <div className="flex gap-2">
+                  <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+                    <SelectTrigger className="flex-1 bg-white h-10">
+                      <SelectValue placeholder="Select permit type..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">+ Create Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={() => {
+                      if (selectedTypeId === "__custom__") {
+                        setIsAddingCustom(true);
+                        setSelectedTypeId("");
+                      } else {
+                        handleAddPermit();
+                      }
+                    }}
+                    disabled={!selectedTypeId}
+                    size="icon"
+                    className="bg-orange-500 hover:bg-orange-600 h-10 w-10"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={customTypeName}
+                    onChange={(e) => setCustomTypeName(e.target.value)}
+                    placeholder="Custom permit name..."
+                    className="flex-1 h-10"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateCustomType();
+                      if (e.key === "Escape") {
+                        setIsAddingCustom(false);
+                        setCustomTypeName("");
+                      }
+                    }}
                   />
-                  <span className="font-medium text-slate-700 flex-1">
-                    {check.label}
-                  </span>
-                  <CheckCircle2
-                    className={cn(
-                      "h-5 w-5 transition-all duration-200",
-                      data[check.id]
-                        ? "text-emerald-500 opacity-100"
-                        : "text-transparent opacity-0"
-                    )}
-                  />
-                </label>
-              ))}
+                  <Button
+                    onClick={handleCreateCustomType}
+                    disabled={!customTypeName.trim()}
+                    className="bg-orange-500 hover:bg-orange-600"
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setIsAddingCustom(false);
+                      setCustomTypeName("");
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
+
+            {/* Permits List */}
+            {isLoadingTypes ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {selectedPermits.map((permit) => (
+                  <div
+                    key={permit.permitTypeId}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                      permit.isApproved
+                        ? "bg-emerald-50 border border-emerald-200"
+                        : "bg-slate-50 border border-slate-200"
+                    )}
+                  >
+                    <Checkbox
+                      checked={permit.isApproved}
+                      onCheckedChange={() => handleToggleApproval(permit.permitTypeId)}
+                    />
+                    <span className="font-medium text-slate-700 flex-1">
+                      {permit.permitTypeName}
+                    </span>
+                    <CheckCircle2
+                      className={cn(
+                        "h-5 w-5 transition-all duration-200",
+                        permit.isApproved
+                          ? "text-emerald-500 opacity-100"
+                          : "text-slate-200 opacity-50"
+                      )}
+                    />
+                    <button
+                      onClick={() => handleRemovePermit(permit.permitTypeId)}
+                      className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {selectedPermits.length === 0 && (
+                  <div className="text-center py-6 text-slate-400 text-sm">
+                    No permits added yet. Select from the dropdown above.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -302,7 +510,7 @@ export function JobCreationWizard({
               <Input
                 id="jobName"
                 type="text"
-                value={data.jobName}
+                value={routeData.jobName}
                 onChange={(e) => handleRouteChange("jobName", e.target.value)}
                 placeholder="Enter job name"
                 className="h-12"
@@ -315,7 +523,7 @@ export function JobCreationWizard({
                 <Input
                   id="startPoleId"
                   type="text"
-                  value={data.startPoleId}
+                  value={routeData.startPoleId}
                   onChange={(e) => handleRouteChange("startPoleId", e.target.value)}
                   placeholder="e.g., P-001"
                   className="h-12"
@@ -326,7 +534,7 @@ export function JobCreationWizard({
                 <Input
                   id="endPoleId"
                   type="text"
-                  value={data.endPoleId}
+                  value={routeData.endPoleId}
                   onChange={(e) => handleRouteChange("endPoleId", e.target.value)}
                   placeholder="e.g., P-050"
                   className="h-12"
@@ -339,7 +547,7 @@ export function JobCreationWizard({
               <Input
                 id="totalDistance"
                 type="number"
-                value={data.totalDistance || ""}
+                value={routeData.totalDistance || ""}
                 onChange={(e) =>
                   handleRouteChange("totalDistance", Number(e.target.value) || 0)
                 }

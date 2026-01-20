@@ -18,6 +18,11 @@ import {
   Waves,
   Maximize2,
   Info,
+  FileText,
+  Image,
+  Download,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -52,6 +57,32 @@ interface User {
   email: string;
 }
 
+interface PermitDocument {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  uploadedAt: string;
+  uploadedBy: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+}
+
+interface JobPermit {
+  id: string;
+  isApproved: boolean;
+  notes: string | null;
+  permitType: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
+  documents: PermitDocument[];
+}
+
 interface JobPlanDetail {
   id: string;
   jobName: string;
@@ -63,10 +94,13 @@ interface JobPlanDetail {
   deadEnds: number;
   tangents: number;
   anchors: number;
+  // Legacy permit fields (kept for backwards compatibility)
   rmpPermitApproved: boolean;
   sesdPermitApproved: boolean;
   makeReadyComplete: boolean;
   easementsClear: boolean;
+  // Dynamic permits
+  permits?: JobPermit[];
   trafficControl: boolean;
   treeTrimming: boolean;
   animalHazards: boolean;
@@ -107,6 +141,7 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [expandedPermits, setExpandedPermits] = useState<Set<string>>(new Set());
 
   const canManage = session?.user?.role && ["MANAGER", "ADMIN", "SUPERUSER"].includes(session.user.role);
 
@@ -119,6 +154,8 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       sesdPermitApproved: job.sesdPermitApproved,
       makeReadyComplete: job.makeReadyComplete,
       easementsClear: job.easementsClear,
+      // Include dynamic permits for validation
+      permits: job.permits?.map(p => ({ id: p.id, isApproved: p.isApproved })),
       jobName: job.jobName,
       startPoleId: job.startPoleId,
       endPoleId: job.endPoleId,
@@ -416,26 +453,119 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
           <div className="job-card">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <span className="text-sm font-medium">Permits Verified</span>
+              <span className="text-sm font-medium">Permits</span>
+              {job.permits && job.permits.length > 0 && (
+                <Badge variant="outline" className="ml-auto text-xs">
+                  {job.permits.filter(p => p.isApproved).length}/{job.permits.length} approved
+                </Badge>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {[
-                { label: "RMP Permit", checked: job.rmpPermitApproved },
-                { label: "SESD Permit", checked: job.sesdPermitApproved },
-                { label: "Make-Ready", checked: job.makeReadyComplete },
-                { label: "Easements", checked: job.easementsClear },
-              ].map((permit) => (
-                <div key={permit.label} className="flex items-center gap-2">
-                  <CheckCircle2 className={cn(
-                    "h-4 w-4",
-                    permit.checked ? "text-emerald-500" : "text-slate-300"
-                  )} />
-                  <span className={permit.checked ? "text-slate-700" : "text-slate-400"}>
-                    {permit.label}
-                  </span>
-                </div>
-              ))}
-            </div>
+            
+            {job.permits && job.permits.length > 0 ? (
+              <div className="space-y-2">
+                {job.permits.map((permit) => {
+                  const isExpanded = expandedPermits.has(permit.id);
+                  const hasDocuments = permit.documents.length > 0;
+                  
+                  return (
+                    <div
+                      key={permit.id}
+                      className={cn(
+                        "rounded-lg border overflow-hidden",
+                        permit.isApproved ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200"
+                      )}
+                    >
+                      <div 
+                        className="flex items-center gap-2 p-2 cursor-pointer hover:bg-slate-50"
+                        onClick={() => {
+                          setExpandedPermits(prev => {
+                            const next = new Set(prev);
+                            if (next.has(permit.id)) {
+                              next.delete(permit.id);
+                            } else {
+                              next.add(permit.id);
+                            }
+                            return next;
+                          });
+                        }}
+                      >
+                        <CheckCircle2 className={cn(
+                          "h-4 w-4 shrink-0",
+                          permit.isApproved ? "text-emerald-500" : "text-slate-300"
+                        )} />
+                        <span className={cn(
+                          "text-sm flex-1",
+                          permit.isApproved ? "text-slate-700" : "text-slate-500"
+                        )}>
+                          {permit.permitType.name}
+                        </span>
+                        {hasDocuments && (
+                          <span className="text-xs text-slate-400">
+                            {permit.documents.length} doc{permit.documents.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {(hasDocuments || permit.notes) && (
+                          isExpanded ? (
+                            <ChevronUp className="h-4 w-4 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-slate-400" />
+                          )
+                        )}
+                      </div>
+                      
+                      {isExpanded && (hasDocuments || permit.notes) && (
+                        <div className="border-t border-slate-200 p-2 bg-white space-y-2">
+                          {permit.notes && (
+                            <p className="text-xs text-slate-600">{permit.notes}</p>
+                          )}
+                          {hasDocuments && (
+                            <div className="space-y-1">
+                              {permit.documents.map((doc) => (
+                                <a
+                                  key={doc.id}
+                                  href={doc.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 p-1.5 rounded hover:bg-slate-50 text-sm"
+                                >
+                                  {doc.fileType.startsWith("image/") ? (
+                                    <Image className="h-4 w-4 text-slate-400" />
+                                  ) : (
+                                    <FileText className="h-4 w-4 text-slate-400" />
+                                  )}
+                                  <span className="flex-1 truncate text-slate-600">{doc.fileName}</span>
+                                  <Download className="h-3 w-3 text-slate-400" />
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Fallback to legacy permit fields if no dynamic permits
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {[
+                  { label: "RMP Permit", checked: job.rmpPermitApproved },
+                  { label: "SESD Permit", checked: job.sesdPermitApproved },
+                  { label: "Make-Ready", checked: job.makeReadyComplete },
+                  { label: "Easements", checked: job.easementsClear },
+                ].map((permit) => (
+                  <div key={permit.label} className="flex items-center gap-2">
+                    <CheckCircle2 className={cn(
+                      "h-4 w-4",
+                      permit.checked ? "text-emerald-500" : "text-slate-300"
+                    )} />
+                    <span className={permit.checked ? "text-slate-700" : "text-slate-400"}>
+                      {permit.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Assignments */}

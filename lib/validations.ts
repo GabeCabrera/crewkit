@@ -127,7 +127,7 @@ export const issueSeveritySchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
 
 export type JobPlanStatus = z.infer<typeof jobPlanStatusSchema>;
 
-// Job Plan creation requires all permits to be verified
+// Job Plan creation - permits are now managed via dynamic JobPermit system
 export const createJobPlanSchema = z.object({
   // Route Details (required)
   jobName: z.string().min(1, "Job name is required").max(200, "Job name too long"),
@@ -142,11 +142,12 @@ export const createJobPlanSchema = z.object({
   tangents: z.number().int().min(0).optional().default(0),
   anchors: z.number().int().min(0).optional().default(0),
   
-  // Permits (ALL REQUIRED to be true for job creation)
-  rmpPermitApproved: z.literal(true, { errorMap: () => ({ message: "RMP Permit must be approved" }) }),
-  sesdPermitApproved: z.literal(true, { errorMap: () => ({ message: "SESD Permit must be approved" }) }),
-  makeReadyComplete: z.literal(true, { errorMap: () => ({ message: "Make-Ready must be complete" }) }),
-  easementsClear: z.literal(true, { errorMap: () => ({ message: "Easements must be clear" }) }),
+  // Legacy permit fields (optional, kept for backwards compatibility)
+  // New dynamic permits are managed via JobPermit relation
+  rmpPermitApproved: z.boolean().optional().default(false),
+  sesdPermitApproved: z.boolean().optional().default(false),
+  makeReadyComplete: z.boolean().optional().default(false),
+  easementsClear: z.boolean().optional().default(false),
   
   // Hazards (optional with defaults)
   trafficControl: z.boolean().optional().default(false),
@@ -170,13 +171,23 @@ export const createJobPlanSchema = z.object({
 // Job Status Transition Validation
 // ==========================================
 
+// Type for permit data in validation
+export interface PermitForValidation {
+  id: string;
+  isApproved: boolean;
+}
+
 // Type for job data used in status transition validation
 export interface JobForStatusValidation {
   status: JobPlanStatus;
-  rmpPermitApproved: boolean;
-  sesdPermitApproved: boolean;
-  makeReadyComplete: boolean;
-  easementsClear: boolean;
+  // Legacy permit fields (for backwards compatibility)
+  rmpPermitApproved?: boolean;
+  sesdPermitApproved?: boolean;
+  makeReadyComplete?: boolean;
+  easementsClear?: boolean;
+  // New dynamic permits
+  permits?: PermitForValidation[];
+  // Route info
   jobName: string;
   startPoleId: string;
   endPoleId: string;
@@ -186,8 +197,15 @@ export interface JobForStatusValidation {
 }
 
 // Check if all permits are verified
+// Uses new dynamic permits if available, falls back to legacy boolean fields
 export function hasAllPermitsVerified(job: JobForStatusValidation): boolean {
-  return (
+  // If job has dynamic permits, use those
+  if (job.permits && job.permits.length > 0) {
+    return job.permits.every(permit => permit.isApproved);
+  }
+  
+  // Fall back to legacy boolean fields for backwards compatibility
+  return Boolean(
     job.rmpPermitApproved &&
     job.sesdPermitApproved &&
     job.makeReadyComplete &&
