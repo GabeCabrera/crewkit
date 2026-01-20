@@ -52,6 +52,13 @@ model User {
   createdTeams  Team[]   @relation("TeamCreator")
   createdReports EndOfDayReport[] @relation("ReportCreator")
   createdFieldReports FieldWorkLog[] @relation("FieldReportCreator")
+  
+  // Job Planning relations
+  createdJobPlans   JobPlan[]       @relation("JobPlanCreator")
+  jobAssignments    JobAssignment[] @relation("JobAssignee")
+  createdAssignments JobAssignment[] @relation("AssignmentCreator")
+  comments          Comment[]
+  notifications     Notification[]
 }
 
 model Team {
@@ -272,4 +279,114 @@ model FieldWorkLog {
   @@index([location])
   @@index([teamId])
   @@index([createdById])
+}
+
+// ============================================================
+// JOB PLANNING SYSTEM
+// ============================================================
+
+enum JobPlanStatus {
+  DRAFT
+  READY
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model JobPlan {
+  id                  String   @id @default(cuid())
+  
+  // Permits
+  rmpPermitApproved   Boolean  @default(false)
+  sesdPermitApproved  Boolean  @default(false)
+  makeReadyComplete   Boolean  @default(false)
+  easementsClear      Boolean  @default(false)
+  
+  // Route
+  jobName             String
+  startPoleId         String
+  endPoleId           String
+  totalDistance       Float
+  
+  // Materials
+  strandFootage       Float
+  fiberFootage        Float
+  deadEnds            Int      @default(0)
+  tangents            Int      @default(0)
+  anchors             Int      @default(0)
+  
+  // Hazards
+  trafficControl      Boolean  @default(false)
+  treeTrimming        Boolean  @default(false)
+  animalHazards       Boolean  @default(false)
+  waterRailCrossing   Boolean  @default(false)
+  foremanNotes        String?
+  
+  // Status
+  status              JobPlanStatus @default(DRAFT)
+  
+  // Relationships
+  createdById         String
+  createdBy           User     @relation("JobPlanCreator", fields: [createdById], references: [id])
+  assignments         JobAssignment[]
+  comments            Comment[]
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([status])
+  @@index([createdById])
+}
+
+model JobAssignment {
+  id           String   @id @default(cuid())
+  jobPlanId    String
+  jobPlan      JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("JobAssignee", fields: [userId], references: [id])
+  assignedById String
+  assignedBy   User     @relation("AssignmentCreator", fields: [assignedById], references: [id])
+  createdAt    DateTime @default(now())
+  
+  @@unique([jobPlanId, userId])
+  @@index([userId])
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  content     String
+  jobPlanId   String
+  jobPlan     JobPlan   @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  parentId    String?
+  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[] @relation("CommentReplies")
+  mentions    String[]  // Array of user IDs mentioned
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([jobPlanId])
+  @@index([parentId])
+}
+
+enum NotificationType {
+  JOB_ASSIGNED
+  COMMENT_MENTION
+  COMMENT_REPLY
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  type        NotificationType
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  jobPlanId   String?
+  title       String
+  message     String           // Truncated preview
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  
+  @@index([userId, isRead])
+  @@index([createdAt])
 }

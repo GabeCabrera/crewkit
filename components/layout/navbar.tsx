@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sidebar } from "./sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NotificationCenter } from "./notification-center";
 import { useEffect, useState } from "react";
 
 function NavbarSkeleton() {
@@ -85,6 +86,7 @@ export function Navbar() {
           
           {/* Right section */}
           <div className="flex items-center gap-2">
+            <NotificationCenter />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
