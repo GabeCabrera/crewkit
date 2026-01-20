@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { put, del } from "@vercel/blob";
+import { del, handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 
 export const dynamic = 'force-dynamic';
 
@@ -66,105 +66,85 @@ export async function GET(
   }
 }
 
-// POST /api/job-plans/[id]/permits/[permitId]/documents - Upload document
+// POST /api/job-plans/[id]/permits/[permitId]/documents - Handle client upload
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; permitId: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Only managers, admins, and superusers can upload documents
-    if (!["MANAGER", "ADMIN", "SUPERUSER"].includes(user.role)) {
-      return NextResponse.json(
-        { error: "Only managers and admins can upload permit documents" },
-        { status: 403 }
-      );
-    }
-
     const { id: jobPlanId, permitId } = await params;
+    const body = await request.json() as HandleUploadBody;
 
-    // Verify permit exists and belongs to job
-    const permit = await prisma.jobPermit.findFirst({
-      where: {
-        id: permitId,
-        jobPlanId,
-      },
-    });
+    // Handle the client upload token request
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname) => {
+        // Authenticate user
+        const session = await getServerSession(authOptions);
+        if (!session) {
+          throw new Error("Unauthorized");
+        }
 
-    if (!permit) {
-      return NextResponse.json({ error: "Permit not found" }, { status: 404 });
-    }
+        const user = await prisma.user.findUnique({
+          where: { id: session.user.id },
+          select: { role: true },
+        });
 
-    // Get form data
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+        if (!user || !["MANAGER", "ADMIN", "SUPERUSER"].includes(user.role)) {
+          throw new Error("Only managers and admins can upload permit documents");
+        }
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Invalid file type. Allowed: PDF, JPEG, PNG, GIF, WebP" },
-        { status: 400 }
-      );
-    }
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "File too large. Maximum size is 10MB" },
-        { status: 400 }
-      );
-    }
-
-    // Upload to Vercel Blob
-    const blob = await put(`permits/${jobPlanId}/${permitId}/${file.name}`, file, {
-      access: "public",
-      addRandomSuffix: true,
-    });
-
-    // Save document metadata to database
-    const document = await prisma.permitDocument.create({
-      data: {
-        jobPermitId: permitId,
-        fileName: file.name,
-        fileUrl: blob.url,
-        fileType: file.type,
-        fileSize: file.size,
-        uploadedById: session.user.id,
-      },
-      include: {
-        uploadedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+        // Verify permit exists and belongs to job
+        const permit = await prisma.jobPermit.findFirst({
+          where: {
+            id: permitId,
+            jobPlanId,
           },
-        },
+        });
+
+        if (!permit) {
+          throw new Error("Permit not found");
+        }
+
+        return {
+          allowedContentTypes: ALLOWED_TYPES,
+          maximumSizeInBytes: MAX_FILE_SIZE,
+          tokenPayload: JSON.stringify({
+            userId: session.user.id,
+            permitId,
+            jobPlanId,
+          }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // Save document metadata to database after successful upload
+        try {
+          const payload = JSON.parse(tokenPayload || "{}");
+          
+          await prisma.permitDocument.create({
+            data: {
+              jobPermitId: payload.permitId,
+              fileName: blob.pathname.split('/').pop() || 'document',
+              fileUrl: blob.url,
+              fileType: blob.contentType || 'application/octet-stream',
+              fileSize: blob.size,
+              uploadedById: payload.userId,
+            },
+          });
+        } catch (error) {
+          console.error("Error saving document metadata:", error);
+          throw new Error("Failed to save document metadata");
+        }
       },
     });
 
-    return NextResponse.json(document, { status: 201 });
+    return NextResponse.json(jsonResponse);
   } catch (error) {
-    console.error("Error uploading permit document:", error);
+    console.error("Error handling upload:", error);
     return NextResponse.json(
-      { error: "Failed to upload document" },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "Failed to upload document" },
+      { status: error instanceof Error && error.message === "Unauthorized" ? 401 : 500 }
     );
   }
 }

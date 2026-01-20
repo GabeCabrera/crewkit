@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { upload } from "@vercel/blob/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,7 @@ import {
   AlertCircle,
   Plus,
   Trash2,
-  Upload,
+  Upload as UploadIcon,
   FileText,
   Image,
   Download,
@@ -214,29 +215,21 @@ export function PermitsStep({ job, canEdit, refreshJob }: PermitsStepProps) {
     }
   };
 
-  // Upload document
+  // Upload document using client-side upload (bypasses serverless body limit)
   const handleFileUpload = async (permitId: string, file: File) => {
     setUploadingPermitId(permitId);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      // Use Vercel Blob client upload - uploads directly to blob storage
+      await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: `/api/job-plans/${job.id}/permits/${permitId}/documents`,
+      });
 
-      const response = await fetch(
-        `/api/job-plans/${job.id}/permits/${permitId}/documents`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (response.ok) {
-        await fetchPermits();
-      } else {
-        const error = await response.json();
-        alert(error.error || "Failed to upload document");
-      }
+      // Refresh permits to show new document
+      await fetchPermits();
     } catch (error) {
       console.error("Error uploading document:", error);
+      alert(error instanceof Error ? error.message : "Failed to upload document");
     } finally {
       setUploadingPermitId(null);
     }
@@ -518,7 +511,7 @@ export function PermitsStep({ job, canEdit, refreshJob }: PermitsStepProps) {
                             {isUploading ? (
                               <Loader2 className="h-3 w-3 animate-spin mr-1" />
                             ) : (
-                              <Upload className="h-3 w-3 mr-1" />
+                              <UploadIcon className="h-3 w-3 mr-1" />
                             )}
                             Upload
                           </Button>
