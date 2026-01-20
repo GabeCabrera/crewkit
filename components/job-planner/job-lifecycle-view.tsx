@@ -557,7 +557,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
       <div className="flex">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:block w-72 bg-white border-r border-slate-200 fixed left-[var(--sidebar-width,16rem)] top-[calc(4rem+1px)] bottom-0 overflow-y-auto">
+        <aside className="hidden lg:block w-72 bg-white border-r border-slate-200 fixed left-[var(--sidebar-width,16rem)] top-[calc(4rem+1px)] bottom-0 overflow-y-auto z-20">
           <JobPhaseSidebar
             currentStep={currentStep}
             onStepChange={handleStepChange}
@@ -567,7 +567,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
         {/* Mobile Sidebar Overlay */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileMenuOpen(false)}>
+          <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setMobileMenuOpen(false)}>
             <aside
               className="absolute left-0 top-0 bottom-0 w-72 bg-white shadow-xl"
               onClick={(e) => e.stopPropagation()}
