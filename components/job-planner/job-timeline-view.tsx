@@ -1,31 +1,15 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
-import { useSession } from "next-auth/react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef, useCallback, useMemo } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
   Users,
   ChevronDown,
-  ChevronRight as ChevronRightIcon,
-  Plus,
-  RefreshCw,
-  Search,
-  X,
-  Filter,
-  Loader2,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type JobPlanStatus = "DRAFT" | "READY" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
@@ -57,7 +41,15 @@ interface JobPlan {
   animalHazards: boolean;
   waterRailCrossing: boolean;
   createdAt: string;
+  createdBy: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
   assignments: Assignment[];
+  _count: {
+    comments: number;
+  };
 }
 
 interface StatusGroup {
@@ -83,19 +75,18 @@ const priorityColors: Record<JobPriority, string> = {
 };
 
 interface JobTimelineViewProps {
-  onCreateNew?: () => void;
+  jobs: JobPlan[];
   onSelectJob?: (job: JobPlan) => void;
+  onUpdateDates?: (jobId: string, startDate: Date, endDate: Date) => void;
   selectedJobId?: string | null;
-  viewOnly?: boolean;
 }
 
 export function JobTimelineView({
-  onCreateNew,
+  jobs,
   onSelectJob,
+  onUpdateDates,
   selectedJobId,
-  viewOnly = false,
 }: JobTimelineViewProps) {
-  const { data: session } = useSession();
   const [timeScale, setTimeScale] = useState<TimeScale>("week");
   const [viewStartDate, setViewStartDate] = useState(() => {
     const today = new Date();
@@ -108,52 +99,7 @@ export function JobTimelineView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<JobPlanStatus>>(
     () => new Set<JobPlanStatus>(["COMPLETED", "CANCELLED"])
   );
-  
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<JobPriority | "ALL">("ALL");
-  const [showFilters, setShowFilters] = useState(false);
-  
   const timelineRef = useRef<HTMLDivElement>(null);
-
-  // Fetch jobs with TanStack Query
-  const { data: jobs = [], isLoading, refetch } = useQuery({
-    queryKey: ["jobs"],
-    queryFn: async () => {
-      const response = await fetch("/api/job-plans");
-      if (!response.ok) throw new Error("Failed to fetch jobs");
-      return response.json() as Promise<JobPlan[]>;
-    },
-    refetchInterval: 30 * 1000,
-    refetchOnWindowFocus: true,
-  });
-
-  // Filter jobs
-  const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        if (
-          !job.jobName.toLowerCase().includes(query) &&
-          !job.startPoleId.toLowerCase().includes(query) &&
-          !job.endPoleId.toLowerCase().includes(query)
-        ) {
-          return false;
-        }
-      }
-      if (priorityFilter !== "ALL" && job.priority !== priorityFilter) {
-        return false;
-      }
-      return true;
-    });
-  }, [jobs, searchQuery, priorityFilter]);
-
-  const hasActiveFilters = searchQuery || priorityFilter !== "ALL";
-
-  const clearFilters = () => {
-    setSearchQuery("");
-    setPriorityFilter("ALL");
-  };
 
   // Calculate visible date range based on scale
   const { dates, dayWidth } = useMemo(() => {
@@ -171,22 +117,22 @@ export function JobTimelineView({
   }, [viewStartDate, timeScale]);
 
   // Navigate time
-  const navigateTime = (direction: "prev" | "next") => {
+  const navigateTime = useCallback((direction: "prev" | "next") => {
     const days = timeScale === "day" ? 7 : timeScale === "week" ? 14 : 30;
     setViewStartDate((prev) => {
       const newDate = new Date(prev);
       newDate.setDate(newDate.getDate() + (direction === "next" ? days : -days));
       return newDate;
     });
-  };
+  }, [timeScale]);
 
-  const goToToday = () => {
+  const goToToday = useCallback(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const dayOfWeek = today.getDay();
     today.setDate(today.getDate() - dayOfWeek);
     setViewStartDate(today);
-  };
+  }, []);
 
   const toggleGroup = (status: JobPlanStatus) => {
     setCollapsedGroups((prev) => {
@@ -209,11 +155,11 @@ export function JobTimelineView({
       COMPLETED: [],
       CANCELLED: [],
     };
-    filteredJobs.forEach((job) => {
+    jobs.forEach((job) => {
       groups[job.status].push(job);
     });
     return groups;
-  }, [filteredJobs]);
+  }, [jobs]);
 
   // Check if a date is today
   const isToday = (date: Date) => {
@@ -252,330 +198,245 @@ export function JobTimelineView({
     return null;
   }, [viewStartDate, dates.length, dayWidth]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      {/* Top Bar - Search, Filters, Actions */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
-          <div className="relative flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search jobs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {/* Header Controls */}
+      <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn("h-9", showFilters && "bg-slate-100")}
+            onClick={() => navigateTime("prev")}
+            className="h-8 w-8 p-0"
           >
-            <Filter className="h-4 w-4 mr-1" />
-            Filters
-            {hasActiveFilters && (
-              <span className="ml-1 h-2 w-2 rounded-full bg-orange-500" />
-            )}
+            <ChevronLeft className="h-4 w-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToToday}
+            className="h-8 px-3 text-xs"
+          >
+            Today
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigateTime("next")}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium text-slate-700 ml-2">
+            {viewStartDate.toLocaleDateString("en-US", {
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500">
-            {filteredJobs.length}{hasActiveFilters ? ` of ${jobs.length}` : ""} jobs
-          </span>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="h-9">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          {onCreateNew && !viewOnly && (
-            <Button size="sm" onClick={onCreateNew} className="h-9 bg-orange-500 hover:bg-orange-600">
-              <Plus className="h-4 w-4 mr-1" />
-              New Job
-            </Button>
-          )}
+        {/* Time Scale Toggle */}
+        <div className="flex items-center rounded-lg bg-white border border-slate-200 p-0.5">
+          {(["day", "week", "month"] as TimeScale[]).map((scale) => (
+            <button
+              key={scale}
+              onClick={() => setTimeScale(scale)}
+              className={cn(
+                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                timeScale === scale
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              {scale.charAt(0).toUpperCase() + scale.slice(1)}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Filter Row */}
-      {showFilters && (
-        <div className="flex flex-wrap gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-          <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as JobPriority | "ALL")}>
-            <SelectTrigger className="w-[140px] h-9 bg-white">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Priorities</SelectItem>
-              <SelectItem value="LOW">Low</SelectItem>
-              <SelectItem value="MEDIUM">Medium</SelectItem>
-              <SelectItem value="HIGH">High</SelectItem>
-              <SelectItem value="URGENT">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 text-slate-500">
-              Clear all
-            </Button>
-          )}
-        </div>
-      )}
-
       {/* Timeline Container */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        {/* Header Controls */}
-        <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateTime("prev")}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={goToToday}
-              className="h-8 px-3 text-xs"
-            >
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateTime("next")}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium text-slate-700 ml-2">
-              {viewStartDate.toLocaleDateString("en-US", {
-                month: "short",
-                year: "numeric",
-              })}
-            </span>
-          </div>
-
-          {/* Time Scale Toggle */}
-          <div className="flex items-center rounded-lg bg-white border border-slate-200 p-0.5">
-            {(["day", "week", "month"] as TimeScale[]).map((scale) => (
-              <button
-                key={scale}
-                onClick={() => setTimeScale(scale)}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                  timeScale === scale
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:text-slate-900"
-                )}
-              >
-                {scale.charAt(0).toUpperCase() + scale.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Timeline Content */}
-        <div className="flex overflow-hidden">
-          {/* Fixed Job Names Column */}
-          <div className="w-48 flex-shrink-0 border-r border-slate-200 bg-white z-10">
-            {/* Empty header cell */}
-            <div className="h-14 border-b border-slate-200 bg-slate-50" />
+      <div className="flex overflow-hidden">
+        {/* Fixed Job Names Column */}
+        <div className="w-48 flex-shrink-0 border-r border-slate-200 bg-white z-10">
+          {/* Empty header cell */}
+          <div className="h-14 border-b border-slate-200 bg-slate-50" />
+          
+          {/* Job rows */}
+          {statusGroups.map((group) => {
+            const groupJobs = groupedJobs[group.id];
+            const isCollapsed = collapsedGroups.has(group.id);
             
-            {/* Job rows */}
-            {statusGroups.map((group) => {
-              const groupJobs = groupedJobs[group.id];
-              const isCollapsed = collapsedGroups.has(group.id);
-              
-              return (
-                <div key={group.id}>
-                  {/* Group header */}
-                  <button
-                    onClick={() => toggleGroup(group.id)}
+            return (
+              <div key={group.id}>
+                {/* Group header */}
+                <button
+                  onClick={() => toggleGroup(group.id)}
+                  className={cn(
+                    "w-full px-3 py-2 flex items-center gap-2 text-left text-sm font-semibold border-b border-slate-100",
+                    group.bgColor
+                  )}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  )}
+                  <span className={cn("w-2 h-2 rounded-full", group.color)} />
+                  <span>{group.title}</span>
+                  <span className="text-xs text-slate-500 ml-auto">
+                    {groupJobs.length}
+                  </span>
+                </button>
+                
+                {/* Job names */}
+                {!isCollapsed && groupJobs.map((job) => (
+                  <div
+                    key={job.id}
+                    onClick={() => onSelectJob?.(job)}
                     className={cn(
-                      "w-full px-3 py-2 flex items-center gap-2 text-left text-sm font-semibold border-b border-slate-100",
-                      group.bgColor
+                      "h-12 px-3 flex items-center border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors",
+                      "border-l-4",
+                      priorityColors[job.priority],
+                      selectedJobId === job.id && "bg-orange-50"
                     )}
                   >
-                    {isCollapsed ? (
-                      <ChevronRightIcon className="h-4 w-4 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-slate-400" />
-                    )}
-                    <span className={cn("w-2 h-2 rounded-full", group.color)} />
-                    <span>{group.title}</span>
-                    <span className="text-xs text-slate-500 ml-auto">
-                      {groupJobs.length}
-                    </span>
-                  </button>
-                  
-                  {/* Job names */}
-                  {!isCollapsed && groupJobs.map((job) => (
-                    <div
-                      key={job.id}
-                      onClick={() => onSelectJob?.(job)}
-                      className={cn(
-                        "h-12 px-3 flex items-center border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition-colors",
-                        "border-l-4",
-                        priorityColors[job.priority],
-                        selectedJobId === job.id && "bg-orange-50"
-                      )}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {job.jobName}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {job.startPoleId} → {job.endPoleId}
-                        </p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {job.jobName}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {job.startPoleId} → {job.endPoleId}
+                      </p>
+                    </div>
+                    {job.assignments.length > 0 && (
+                      <div className="flex items-center text-slate-400 ml-1">
+                        <Users className="h-3 w-3" />
+                        <span className="text-xs ml-0.5">{job.assignments.length}</span>
                       </div>
-                      {job.assignments.length > 0 && (
-                        <div className="flex items-center text-slate-400 ml-1">
-                          <Users className="h-3 w-3" />
-                          <span className="text-xs ml-0.5">{job.assignments.length}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  
-                  {/* Empty state for group */}
-                  {!isCollapsed && groupJobs.length === 0 && (
-                    <div className="h-12 px-3 flex items-center justify-center text-xs text-slate-400 border-b border-slate-100">
-                      No jobs
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Scrollable Timeline Area */}
-          <div
-            ref={timelineRef}
-            className="flex-1 overflow-x-auto"
-            style={{ scrollBehavior: "smooth" }}
-          >
-            <div style={{ minWidth: dates.length * dayWidth }}>
-              {/* Date Header */}
-              <div className="h-14 flex border-b border-slate-200 bg-slate-50 sticky top-0">
-                {dates.map((date, i) => {
-                  const { day, num } = formatDateHeader(date);
-                  const weekend = isWeekend(date);
-                  const today = isToday(date);
-                  
-                  return (
-                    <div
-                      key={i}
-                      className={cn(
-                        "flex-shrink-0 flex flex-col items-center justify-center border-r border-slate-100",
-                        weekend && "bg-slate-100/50",
-                        today && "bg-orange-50"
-                      )}
-                      style={{ width: dayWidth }}
-                    >
-                      <span className={cn(
-                        "text-xs",
-                        today ? "text-orange-600 font-semibold" : "text-slate-500"
-                      )}>
-                        {day}
-                      </span>
-                      <span className={cn(
-                        "text-sm font-semibold",
-                        today ? "text-orange-600" : "text-slate-700"
-                      )}>
-                        {num}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Timeline Rows */}
-              <div className="relative">
-                {/* Today indicator line */}
-                {todayPosition !== null && (
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-orange-500 z-20 pointer-events-none"
-                    style={{ left: todayPosition + dayWidth / 2 }}
-                  />
+                    )}
+                  </div>
+                ))}
+                
+                {/* Empty state for group */}
+                {!isCollapsed && groupJobs.length === 0 && (
+                  <div className="h-12 px-3 flex items-center justify-center text-xs text-slate-400 border-b border-slate-100">
+                    No jobs
+                  </div>
                 )}
+              </div>
+            );
+          })}
+        </div>
 
-                {statusGroups.map((group) => {
-                  const groupJobs = groupedJobs[group.id];
-                  const isCollapsed = collapsedGroups.has(group.id);
-                  
-                  return (
-                    <div key={group.id}>
-                      {/* Group header row */}
-                      <div
-                        className={cn(
-                          "h-[37px] border-b border-slate-100 flex",
-                          group.bgColor
-                        )}
-                      >
+        {/* Scrollable Timeline Area */}
+        <div
+          ref={timelineRef}
+          className="flex-1 overflow-x-auto"
+          style={{ scrollBehavior: "smooth" }}
+        >
+          <div style={{ minWidth: dates.length * dayWidth }}>
+            {/* Date Header */}
+            <div className="h-14 flex border-b border-slate-200 bg-slate-50 sticky top-0">
+              {dates.map((date, i) => {
+                const { day, num } = formatDateHeader(date);
+                const weekend = isWeekend(date);
+                const today = isToday(date);
+                
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex-shrink-0 flex flex-col items-center justify-center border-r border-slate-100",
+                      weekend && "bg-slate-100/50",
+                      today && "bg-orange-50"
+                    )}
+                    style={{ width: dayWidth }}
+                  >
+                    <span className={cn(
+                      "text-xs",
+                      today ? "text-orange-600 font-semibold" : "text-slate-500"
+                    )}>
+                      {day}
+                    </span>
+                    <span className={cn(
+                      "text-sm font-semibold",
+                      today ? "text-orange-600" : "text-slate-700"
+                    )}>
+                      {num}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Timeline Rows */}
+            <div className="relative">
+              {/* Today indicator line */}
+              {todayPosition !== null && (
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-orange-500 z-20 pointer-events-none"
+                  style={{ left: todayPosition + dayWidth / 2 }}
+                />
+              )}
+
+              {statusGroups.map((group) => {
+                const groupJobs = groupedJobs[group.id];
+                const isCollapsed = collapsedGroups.has(group.id);
+                
+                return (
+                  <div key={group.id}>
+                    {/* Group header row */}
+                    <div
+                      className={cn(
+                        "h-[37px] border-b border-slate-100 flex",
+                        group.bgColor
+                      )}
+                    >
+                      {dates.map((date, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "flex-shrink-0 border-r border-slate-100/50",
+                            isWeekend(date) && "bg-slate-100/30"
+                          )}
+                          style={{ width: dayWidth }}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Job timeline bars */}
+                    {!isCollapsed && groupJobs.map((job) => (
+                      <TimelineBar
+                        key={job.id}
+                        job={job}
+                        dates={dates}
+                        dayWidth={dayWidth}
+                        viewStartDate={viewStartDate}
+                        onSelect={() => onSelectJob?.(job)}
+                        onUpdateDates={onUpdateDates}
+                        isSelected={selectedJobId === job.id}
+                        statusColor={group.color}
+                      />
+                    ))}
+                    
+                    {/* Empty row */}
+                    {!isCollapsed && groupJobs.length === 0 && (
+                      <div className="h-12 flex border-b border-slate-100">
                         {dates.map((date, i) => (
                           <div
                             key={i}
                             className={cn(
-                              "flex-shrink-0 border-r border-slate-100/50",
-                              isWeekend(date) && "bg-slate-100/30"
+                              "flex-shrink-0 border-r border-slate-100",
+                              isWeekend(date) && "bg-slate-50/50"
                             )}
                             style={{ width: dayWidth }}
                           />
                         ))}
                       </div>
-                      
-                      {/* Job timeline bars */}
-                      {!isCollapsed && groupJobs.map((job) => (
-                        <TimelineBar
-                          key={job.id}
-                          job={job}
-                          dates={dates}
-                          dayWidth={dayWidth}
-                          viewStartDate={viewStartDate}
-                          onSelect={() => onSelectJob?.(job)}
-                          isSelected={selectedJobId === job.id}
-                          statusColor={group.color}
-                        />
-                      ))}
-                      
-                      {/* Empty row */}
-                      {!isCollapsed && groupJobs.length === 0 && (
-                        <div className="h-12 flex border-b border-slate-100">
-                          {dates.map((date, i) => (
-                            <div
-                              key={i}
-                              className={cn(
-                                "flex-shrink-0 border-r border-slate-100",
-                                isWeekend(date) && "bg-slate-50/50"
-                              )}
-                              style={{ width: dayWidth }}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -593,6 +454,7 @@ interface TimelineBarProps {
   dayWidth: number;
   viewStartDate: Date;
   onSelect: () => void;
+  onUpdateDates?: (jobId: string, startDate: Date, endDate: Date) => void;
   isSelected: boolean;
   statusColor: string;
 }
@@ -603,6 +465,7 @@ function TimelineBar({
   dayWidth,
   viewStartDate,
   onSelect,
+  onUpdateDates,
   isSelected,
   statusColor,
 }: TimelineBarProps) {

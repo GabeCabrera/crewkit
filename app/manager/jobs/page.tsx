@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Briefcase, Loader2 } from "lucide-react";
-import { JobTimelineView } from "@/components/job-planner/job-timeline-view";
+import { JobKanbanBoard } from "@/components/job-planner/job-kanban-board";
 import { JobDetailPanel } from "@/components/job-planner/job-detail-panel";
 
 function JobsPageContent() {
@@ -94,7 +94,7 @@ function JobsPageContent() {
 
       {/* Content */}
       <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-7xl mx-auto">
-        <JobTimelineView
+        <JobKanbanBoard
           key={refreshKey}
           onCreateNew={handleCreateNew}
           onSelectJob={handleSelectJob}

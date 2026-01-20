@@ -27,6 +27,8 @@ import {
   Flag,
   ChevronUp,
 } from "lucide-react";
+import { JobViewSwitcher, ViewMode } from "./job-view-switcher";
+import { JobTimelineView } from "./job-timeline-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -69,6 +71,7 @@ interface JobPlan {
   actualFootage: number;
   status: JobPlanStatus;
   priority: JobPriority;
+  plannedStartDate: string | null;
   plannedEndDate: string | null;
   trafficControl: boolean;
   treeTrimming: boolean;
@@ -205,6 +208,23 @@ export function JobKanbanBoard({
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<JobPlan | null>(null);
+
+  // View mode state (persisted in localStorage)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("jobBoardViewMode");
+      if (saved === "kanban" || saved === "timeline" || saved === "list") {
+        return saved;
+      }
+    }
+    return "kanban";
+  });
+
+  // Persist view mode changes
+  const handleViewChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem("jobBoardViewMode", mode);
+  };
 
   // Refs for debounced name update
   const nameUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -465,11 +485,11 @@ export function JobKanbanBoard({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-slate-900">Job Board</h2>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <JobViewSwitcher currentView={viewMode} onViewChange={handleViewChange} />
           <span className="text-sm text-slate-500">
-            ({filteredJobs.length}{hasActiveFilters ? ` of ${jobs.length}` : ""} jobs)
+            {filteredJobs.length}{hasActiveFilters ? ` of ${jobs.length}` : ""} jobs
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -569,8 +589,14 @@ export function JobKanbanBoard({
         </div>
       )}
 
-      {/* Conditional View: Mobile List or Desktop Kanban */}
-      {isMobile ? (
+      {/* Conditional View Based on Mode */}
+      {viewMode === "timeline" ? (
+        <JobTimelineView
+          jobs={filteredJobs}
+          onSelectJob={onSelectJob}
+          selectedJobId={selectedJobId}
+        />
+      ) : viewMode === "list" || isMobile ? (
         <MobileListView
           jobs={filteredJobs}
           columns={columns}
