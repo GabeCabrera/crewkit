@@ -87,21 +87,29 @@ export function DesignToolbar({
   const [mstDropdownOpen, setMstDropdownOpen] = useState(false);
 
   const handleNodeTypeClick = (nodeType: NodeType) => {
-    onNodeTypeSelect(nodeType);
-    onModeChange("add_node");
     setNodeDropdownOpen(false);
+    // Use setTimeout to avoid state updates during radix-ui's internal render cycle
+    setTimeout(() => {
+      onNodeTypeSelect(nodeType);
+    }, 0);
   };
 
   const handleFiberCountSelect = (count: FiberCount) => {
-    onFiberCountChange(count);
-    onModeChange("connect_fiber");
     setFiberDropdownOpen(false);
+    // Use setTimeout to avoid state updates during radix-ui's internal render cycle
+    setTimeout(() => {
+      onFiberCountChange(count);
+      onModeChange("connect_fiber");
+    }, 0);
   };
 
   const handleMstCountSelect = (count: FiberCount) => {
-    onFiberCountChange(count);
-    onModeChange("connect_mst");
     setMstDropdownOpen(false);
+    // Use setTimeout to avoid state updates during radix-ui's internal render cycle
+    setTimeout(() => {
+      onFiberCountChange(count);
+      onModeChange("connect_mst");
+    }, 0);
   };
 
   const SelectedNodeIcon = selectedNodeType ? getLucideIcon(selectedNodeType.icon) : Plus;

@@ -130,6 +130,12 @@ export function NetworkDesign({ jobId, enabled, canEdit }: NetworkDesignProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // Track mounted state to prevent hydration issues with radix-ui dropdowns
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   
   // Inject styles on mount
   useEffect(() => {
@@ -489,8 +495,8 @@ export function NetworkDesign({ jobId, enabled, canEdit }: NetworkDesignProps) {
         />
       ))}
       
-      {/* Toolbar - positioned outside MapContainer */}
-      {canEdit && (
+      {/* Toolbar - positioned outside MapContainer, only render after mount to prevent hydration issues */}
+      {canEdit && isMounted && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000]">
           <DesignToolbar
             mode={mode}
@@ -510,8 +516,8 @@ export function NetworkDesign({ jobId, enabled, canEdit }: NetworkDesignProps) {
         </div>
       )}
       
-      {/* Properties panel */}
-      {selection && (
+      {/* Properties panel - only render after mount to prevent hydration issues */}
+      {selection && isMounted && (
         <div className="absolute top-16 right-3 z-[1000]">
           <DesignProperties
             selection={selection}
@@ -525,21 +531,23 @@ export function NetworkDesign({ jobId, enabled, canEdit }: NetworkDesignProps) {
         </div>
       )}
       
-      {/* Materials panel */}
-      <div className="absolute bottom-3 left-3 z-[1000]">
-        <JobMaterialsPanel
-          totalStrandFootage={totalStrandFootage}
-          fiberByCount={fiberByCount}
-          allocations={allocations}
-          nodeCount={nodes.length}
-          routeCount={routes.length}
-          onRecalculate={handleRecalculate}
-          isCalculating={isCalculating}
-        />
-      </div>
+      {/* Materials panel - only render after mount to prevent hydration issues */}
+      {isMounted && (
+        <div className="absolute bottom-3 left-3 z-[1000]">
+          <JobMaterialsPanel
+            totalStrandFootage={totalStrandFootage}
+            fiberByCount={fiberByCount}
+            allocations={allocations}
+            nodeCount={nodes.length}
+            routeCount={routes.length}
+            onRecalculate={handleRecalculate}
+            isCalculating={isCalculating}
+          />
+        </div>
+      )}
       
       {/* Element picker */}
-      {pickerPosition && pickerElements.length > 0 && (
+      {isMounted && pickerPosition && pickerElements.length > 0 && (
         <ElementPicker
           elements={pickerElements}
           position={pickerPosition}
