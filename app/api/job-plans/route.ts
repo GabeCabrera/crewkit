@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Validate required fields
+    // Validate required fields (use undefined/null check to allow 0 for numeric fields)
     const requiredFields = ["jobName", "startPoleId", "endPoleId", "totalDistance"];
     for (const field of requiredFields) {
-      if (!body[field]) {
+      if (body[field] === undefined || body[field] === null || body[field] === "") {
         return NextResponse.json(
           { error: `Missing required field: ${field}` },
           { status: 400 }
@@ -148,8 +148,8 @@ export async function POST(request: NextRequest) {
         animalHazards: body.animalHazards ?? false,
         waterRailCrossing: body.waterRailCrossing ?? false,
         foremanNotes: body.foremanNotes ?? null,
-        // Status
-        status: body.status ?? "READY",
+        // Status - default to DRAFT for new jobs created via quick-create flow
+        status: body.status ?? "DRAFT",
         // Creator
         createdById: session.user.id,
       },
