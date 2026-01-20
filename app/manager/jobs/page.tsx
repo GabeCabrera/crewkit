@@ -1,20 +1,16 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { Briefcase } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Briefcase, Loader2 } from "lucide-react";
 import { JobKanbanBoard } from "@/components/job-planner/job-kanban-board";
 import { JobDetailPanel } from "@/components/job-planner/job-detail-panel";
-import { JobPlannerWizard } from "@/components/job-planner/job-planner-wizard";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
 
 function JobsPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [showCreateWizard, setShowCreateWizard] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Check for job query parameter
@@ -35,15 +31,49 @@ function JobsPageContent() {
     window.history.replaceState({}, "", "/manager/jobs");
   };
 
-  const handleJobCreated = (jobId: string) => {
-    setShowCreateWizard(false);
-    setSelectedJobId(jobId);
-    setRefreshKey((prev) => prev + 1);
+  const handleCreateNew = async () => {
+    setIsCreating(true);
+    try {
+      const res = await fetch("/api/job-plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobName: `New Job - ${new Date().toLocaleDateString()}`,
+          startPoleId: "TBD",
+          endPoleId: "TBD",
+          totalDistance: 0,
+          strandFootage: 0,
+          fiberFootage: 0,
+        }),
+      });
+      
+      if (res.ok) {
+        const job = await res.json();
+        router.push(`/manager/jobs/${job.id}`);
+      } else {
+        console.error("Failed to create job");
+        setIsCreating(false);
+      }
+    } catch (error) {
+      console.error("Error creating job:", error);
+      setIsCreating(false);
+    }
   };
 
   const handleJobUpdated = () => {
     setRefreshKey((prev) => prev + 1);
   };
+
+  if (isCreating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+          <p className="text-slate-500">Creating new job...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white -m-4 sm:-m-6 lg:-m-8">
@@ -66,7 +96,7 @@ function JobsPageContent() {
       <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-7xl mx-auto">
         <JobKanbanBoard
           key={refreshKey}
-          onCreateNew={() => setShowCreateWizard(true)}
+          onCreateNew={handleCreateNew}
           onSelectJob={handleSelectJob}
           selectedJobId={selectedJobId}
         />
@@ -81,16 +111,6 @@ function JobsPageContent() {
           basePath="/manager/jobs"
         />
       )}
-
-      {/* Create Job Wizard Dialog */}
-      <Dialog open={showCreateWizard} onOpenChange={setShowCreateWizard}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
-          <JobPlannerWizard
-            onComplete={handleJobCreated}
-            redirectPath="/manager/jobs"
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
