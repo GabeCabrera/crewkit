@@ -107,15 +107,18 @@ export function RouteMapView({
   const [networkDesignMode, setNetworkDesignMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const hasInitializedLayers = useRef(false);
 
   // Get the selected layer for editing
   const selectedLayer = selectedLayerId
     ? mapConfig.layers.find((l) => l.id === selectedLayerId)
     : null;
 
-  // Sync layers from initialConfig when it changes (e.g., after API load)
+  // Sync layers from initialConfig only on initial load (not on subsequent changes)
+  // This prevents race conditions when toggling layer visibility
   useEffect(() => {
-    if (initialConfig?.layers && initialConfig.layers.length > 0) {
+    if (!hasInitializedLayers.current && initialConfig?.layers && initialConfig.layers.length > 0) {
+      hasInitializedLayers.current = true;
       const layers = initialConfig.layers;
       setMapConfig(prev => ({
         ...prev,
