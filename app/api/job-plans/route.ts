@@ -65,6 +65,13 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        projectArea: {
+          select: {
+            id: true,
+            name: true,
+            prefix: true,
+          },
+        },
         _count: {
           select: {
             comments: true,
@@ -82,6 +89,19 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Generate a standardized job name from project area
+ * Format: {PREFIX}-{MMYY}-{SEQ}
+ * Example: WM-0126-001
+ */
+function generateJobName(prefix: string, sequenceNumber: number): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear()).slice(-2);
+  const seq = String(sequenceNumber).padStart(3, '0');
+  return `${prefix}-${month}${year}-${seq}`;
 }
 
 // POST /api/job-plans - Create a new job plan
@@ -125,6 +145,56 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data;
 
+    // If projectAreaId is provided, auto-generate job name
+    let jobName = data.jobName;
+    let sequenceNumber: number | null = null;
+    let projectAreaId: string | null = null;
+
+    if (data.projectAreaId) {
+      // Use a transaction to atomically get and increment the sequence number
+      const result = await prisma.$transaction(async (tx) => {
+        // Get and lock the project area
+        const projectArea = await tx.projectArea.findUnique({
+          where: { id: data.projectAreaId! },
+        });
+
+        if (!projectArea) {
+          throw new Error("Project area not found");
+        }
+
+        if (projectArea.isArchived) {
+          throw new Error("Cannot create jobs in an archived project area");
+        }
+
+        // Get the current sequence number
+        const currentSeq = projectArea.nextSeq;
+
+        // Increment the sequence number
+        await tx.projectArea.update({
+          where: { id: data.projectAreaId! },
+          data: { nextSeq: currentSeq + 1 },
+        });
+
+        return {
+          prefix: projectArea.prefix,
+          sequenceNumber: currentSeq,
+          projectAreaId: projectArea.id,
+        };
+      });
+
+      jobName = generateJobName(result.prefix, result.sequenceNumber);
+      sequenceNumber = result.sequenceNumber;
+      projectAreaId = result.projectAreaId;
+    }
+
+    // Ensure jobName is defined (validation guarantees either jobName or projectAreaId is provided)
+    if (!jobName) {
+      return NextResponse.json(
+        { error: "Job name is required when not using a project area" },
+        { status: 400 }
+      );
+    }
+
     const jobPlan = await prisma.jobPlan.create({
       data: {
         // Permits
@@ -133,12 +203,15 @@ export async function POST(request: NextRequest) {
         makeReadyComplete: data.makeReadyComplete,
         easementsClear: data.easementsClear,
         // Route
-        jobName: data.jobName,
+        jobName,
         jobNumber: data.jobNumber,
         locationName: data.locationName,
         vetroProjectUrl: data.vetroProjectUrl || null,
         totalDistance: data.totalDistance ?? 0,
         poleCount: data.poleCount ?? 0,
+        // Project Area (for standardized naming)
+        projectAreaId,
+        sequenceNumber,
         // Materials (with defaults based on totalDistance)
         strandFootage: data.strandFootage ?? data.totalDistance ?? 0,
         fiberFootage: data.fiberFootage ?? Math.round((data.totalDistance ?? 0) * 1.1),
@@ -181,12 +254,24 @@ export async function POST(request: NextRequest) {
             },
           },
         },
+        projectArea: true,
       },
     });
 
     return NextResponse.json(jobPlan, { status: 201 });
   } catch (error) {
     console.error("Error creating job plan:", error);
+    
+    // Handle specific errors
+    if (error instanceof Error) {
+      if (error.message === "Project area not found") {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+      if (error.message === "Cannot create jobs in an archived project area") {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+    }
+    
     return NextResponse.json(
       { error: "Failed to create job plan" },
       { status: 500 }

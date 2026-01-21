@@ -73,6 +73,13 @@ export async function GET(
         constructionPrints: {
           orderBy: { uploadedAt: "desc" },
         },
+        projectArea: {
+          select: {
+            id: true,
+            name: true,
+            prefix: true,
+          },
+        },
         comments: {
           where: { parentId: null }, // Only top-level comments
           include: {

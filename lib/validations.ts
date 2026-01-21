@@ -129,13 +129,17 @@ export type JobPlanStatus = z.infer<typeof jobPlanStatusSchema>;
 
 // Job Plan creation - permits are now managed via dynamic JobPermit system
 export const createJobPlanSchema = z.object({
-  // Route Details (required)
-  jobName: z.string().min(1, "Job name is required").max(200, "Job name too long"),
+  // Route Details
+  // jobName is optional if projectAreaId is provided (will be auto-generated)
+  jobName: z.string().min(1, "Job name is required").max(200, "Job name too long").optional(),
   jobNumber: z.string().max(50, "Job number too long").optional().nullable(),
   locationName: z.string().max(200, "Location name too long").optional().nullable(),
   vetroProjectUrl: z.string().url("Invalid URL format").max(500, "URL too long").optional().nullable().or(z.literal("")),
   totalDistance: z.number().min(0, "Distance must be 0 or greater").default(0),
   poleCount: z.number().int().min(0, "Pole count must be 0 or greater").default(0),
+  
+  // Project Area for standardized naming (auto-generates jobName)
+  projectAreaId: z.string().cuid("Invalid project area ID").optional().nullable(),
   
   // Materials (optional with defaults)
   strandFootage: z.number().min(0).optional(),
@@ -167,7 +171,10 @@ export const createJobPlanSchema = z.object({
   // Status/Priority (optional with defaults)
   status: jobPlanStatusSchema.optional().default("DRAFT"),
   priority: jobPrioritySchema.optional().default("MEDIUM"),
-});
+}).refine(
+  (data) => data.jobName || data.projectAreaId,
+  { message: "Either jobName or projectAreaId is required", path: ["jobName"] }
+);
 
 // ==========================================
 // Job Status Transition Validation

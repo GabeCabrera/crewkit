@@ -95,6 +95,16 @@ export interface JobPlanData {
   // Planning - Route
   jobName: string;
   jobNumber: string | null;
+  
+  // Project Area (standardized naming)
+  projectAreaId: string | null;
+  projectArea?: {
+    id: string;
+    name: string;
+    prefix: string;
+  } | null;
+  sequenceNumber: number | null;
+  
   locationName: string | null;
   locationAddress: string | null;
   locationLat: number | null;

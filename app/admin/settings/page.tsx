@@ -1,15 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
+import { 
+  Settings, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  CheckCircle2, 
+  AlertCircle, 
+  Building2,
+  MapPin,
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  X,
+  Check,
+} from "lucide-react";
+
+interface ProjectArea {
+  id: string;
+  name: string;
+  prefix: string;
+  nextSeq: number;
+  _count: {
+    jobPlans: number;
+  };
+}
 
 export default function AdminSettingsPage() {
   const { data: session } = useSession();
   const isSuperuser = session?.user?.role === "SUPERUSER";
+  const isAdmin = session?.user?.role === "ADMIN" || isSuperuser;
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -25,6 +51,41 @@ export default function AdminSettingsPage() {
   const [companySuccess, setCompanySuccess] = useState<string | null>(null);
   const [companyError, setCompanyError] = useState<string | null>(null);
 
+  // Project Areas settings (ADMIN/SUPERUSER)
+  const [projectAreas, setProjectAreas] = useState<ProjectArea[]>([]);
+  const [areasLoading, setAreasLoading] = useState(false);
+  const [areasError, setAreasError] = useState<string | null>(null);
+  const [areasSuccess, setAreasSuccess] = useState<string | null>(null);
+  
+  // New area form
+  const [newAreaName, setNewAreaName] = useState("");
+  const [newAreaPrefix, setNewAreaPrefix] = useState("");
+  const [addingArea, setAddingArea] = useState(false);
+  
+  // Edit area
+  const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
+  const [editingAreaName, setEditingAreaName] = useState("");
+  const [editingAreaPrefix, setEditingAreaPrefix] = useState("");
+  const [savingArea, setSavingArea] = useState(false);
+
+  // Fetch project areas
+  const fetchProjectAreas = useCallback(async () => {
+    if (!isAdmin) return;
+    
+    setAreasLoading(true);
+    try {
+      const response = await fetch("/api/project-areas");
+      if (response.ok) {
+        const data = await response.json();
+        setProjectAreas(data);
+      }
+    } catch (err) {
+      console.error("Error fetching project areas:", err);
+    } finally {
+      setAreasLoading(false);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     if (isSuperuser) {
       fetch("/api/settings")
@@ -36,7 +97,9 @@ export default function AdminSettingsPage() {
         })
         .catch(console.error);
     }
-  }, [isSuperuser]);
+    
+    fetchProjectAreas();
+  }, [isSuperuser, fetchProjectAreas]);
 
   const handleSaveCompanyName = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +121,6 @@ export default function AdminSettingsPage() {
 
       if (response.ok) {
         setCompanySuccess("Company name updated successfully");
-        // Trigger a page refresh to update navbar
         window.location.reload();
       } else {
         const data = await response.json();
@@ -107,6 +169,113 @@ export default function AdminSettingsPage() {
       setError("An error occurred");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Project Areas handlers
+  const handleAddArea = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAreasError(null);
+    setAreasSuccess(null);
+
+    if (!newAreaName.trim() || !newAreaPrefix.trim()) {
+      setAreasError("Name and prefix are required");
+      return;
+    }
+
+    setAddingArea(true);
+    try {
+      const response = await fetch("/api/project-areas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newAreaName.trim(),
+          prefix: newAreaPrefix.trim().toUpperCase(),
+        }),
+      });
+
+      if (response.ok) {
+        setAreasSuccess("Project area added successfully");
+        setNewAreaName("");
+        setNewAreaPrefix("");
+        await fetchProjectAreas();
+        setTimeout(() => setAreasSuccess(null), 3000);
+      } else {
+        const data = await response.json();
+        setAreasError(data.error || "Failed to add project area");
+      }
+    } catch (err) {
+      setAreasError("An error occurred");
+    } finally {
+      setAddingArea(false);
+    }
+  };
+
+  const startEditingArea = (area: ProjectArea) => {
+    setEditingAreaId(area.id);
+    setEditingAreaName(area.name);
+    setEditingAreaPrefix(area.prefix);
+  };
+
+  const cancelEditingArea = () => {
+    setEditingAreaId(null);
+    setEditingAreaName("");
+    setEditingAreaPrefix("");
+  };
+
+  const handleSaveArea = async () => {
+    if (!editingAreaId) return;
+    
+    setAreasError(null);
+    setSavingArea(true);
+    
+    try {
+      const response = await fetch(`/api/project-areas/${editingAreaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingAreaName.trim(),
+          prefix: editingAreaPrefix.trim().toUpperCase(),
+        }),
+      });
+
+      if (response.ok) {
+        setAreasSuccess("Project area updated successfully");
+        cancelEditingArea();
+        await fetchProjectAreas();
+        setTimeout(() => setAreasSuccess(null), 3000);
+      } else {
+        const data = await response.json();
+        setAreasError(data.error || "Failed to update project area");
+      }
+    } catch (err) {
+      setAreasError("An error occurred");
+    } finally {
+      setSavingArea(false);
+    }
+  };
+
+  const handleArchiveArea = async (areaId: string, areaName: string) => {
+    if (!confirm(`Are you sure you want to archive "${areaName}"? Jobs in this area will keep their names, but you won't be able to create new jobs in this area.`)) {
+      return;
+    }
+
+    setAreasError(null);
+    try {
+      const response = await fetch(`/api/project-areas/${areaId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setAreasSuccess("Project area archived successfully");
+        await fetchProjectAreas();
+        setTimeout(() => setAreasSuccess(null), 3000);
+      } else {
+        const data = await response.json();
+        setAreasError(data.error || "Failed to archive project area");
+      }
+    } catch (err) {
+      setAreasError("An error occurred");
     }
   };
 
@@ -271,21 +440,174 @@ export default function AdminSettingsPage() {
           </div>
         )}
 
-        {/* Additional Settings Placeholder */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center">
-              <Settings className="h-5 w-5 text-slate-400" />
+        {/* Project Areas Settings (ADMIN/SUPERUSER) */}
+        {isAdmin && (
+          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                <MapPin className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Project Areas</h2>
+                <p className="text-sm text-slate-500">Configure job naming prefixes by area</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">System Settings</h2>
-              <p className="text-sm text-slate-500">Additional configuration options</p>
+
+            {areasSuccess && (
+              <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-3 rounded-xl text-sm mb-4">
+                <CheckCircle2 className="h-4 w-4" />
+                {areasSuccess}
+              </div>
+            )}
+            
+            {areasError && (
+              <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm mb-4">
+                <AlertCircle className="h-4 w-4" />
+                {areasError}
+              </div>
+            )}
+
+            {/* Existing Areas List */}
+            <div className="space-y-3 mb-6">
+              {areasLoading ? (
+                <div className="flex items-center justify-center py-8 text-slate-400">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading areas...
+                </div>
+              ) : projectAreas.length === 0 ? (
+                <div className="text-center py-8 text-slate-400">
+                  <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No project areas defined yet</p>
+                  <p className="text-sm mt-1">Add your first area below</p>
+                </div>
+              ) : (
+                projectAreas.map((area) => (
+                  <div
+                    key={area.id}
+                    className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100"
+                  >
+                    {editingAreaId === area.id ? (
+                      // Editing mode
+                      <>
+                        <div className="flex-1 flex items-center gap-2">
+                          <Input
+                            value={editingAreaPrefix}
+                            onChange={(e) => setEditingAreaPrefix(e.target.value.toUpperCase())}
+                            className="w-20 h-9 text-center font-mono font-bold"
+                            maxLength={10}
+                            placeholder="WM"
+                          />
+                          <Input
+                            value={editingAreaName}
+                            onChange={(e) => setEditingAreaName(e.target.value)}
+                            className="flex-1 h-9"
+                            placeholder="Area name"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={handleSaveArea}
+                            disabled={savingArea}
+                          >
+                            {savingArea ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4 text-emerald-600" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={cancelEditingArea}
+                          >
+                            <X className="h-4 w-4 text-slate-400" />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      // Display mode
+                      <>
+                        <div className="h-9 px-3 rounded-lg bg-blue-100 text-blue-700 font-mono font-bold flex items-center justify-center min-w-[60px]">
+                          {area.prefix}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-700 truncate">{area.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {area._count.jobPlans} job{area._count.jobPlans !== 1 ? "s" : ""} • Next: {area.prefix}-MMYY-{String(area.nextSeq).padStart(3, '0')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                            onClick={() => startEditingArea(area)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-500"
+                            onClick={() => handleArchiveArea(area.id, area.name)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
+
+            {/* Add New Area Form */}
+            <form onSubmit={handleAddArea} className="pt-4 border-t border-slate-100">
+              <p className="text-sm font-medium text-slate-700 mb-3">Add New Area</p>
+              <div className="flex items-end gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="newAreaPrefix" className="text-xs text-slate-500">Prefix</Label>
+                  <Input
+                    id="newAreaPrefix"
+                    value={newAreaPrefix}
+                    onChange={(e) => setNewAreaPrefix(e.target.value.toUpperCase())}
+                    placeholder="WM"
+                    className="w-20 h-11 text-center font-mono font-bold"
+                    maxLength={10}
+                  />
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor="newAreaName" className="text-xs text-slate-500">Name</Label>
+                  <Input
+                    id="newAreaName"
+                    value={newAreaName}
+                    onChange={(e) => setNewAreaName(e.target.value)}
+                    placeholder="West Mountain"
+                    className="h-11"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={addingArea || !newAreaName.trim() || !newAreaPrefix.trim()}
+                  className="bg-blue-500 hover:bg-blue-600 h-11 px-4"
+                >
+                  {addingArea ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                Jobs will be named: <span className="font-mono">{newAreaPrefix || "XX"}-MMYY-001</span>
+              </p>
+            </form>
           </div>
-          <div className="text-center py-8 text-slate-400">
-            <p>More settings coming soon</p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

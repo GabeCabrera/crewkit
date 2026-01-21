@@ -285,6 +285,19 @@ model FieldWorkLog {
 // JOB PLANNING SYSTEM
 // ============================================================
 
+// Project Areas for standardized job naming
+model ProjectArea {
+  id          String    @id @default(cuid())
+  name        String    @unique  // "West Mountain"
+  prefix      String    @unique  // "WM"
+  nextSeq     Int       @default(1)  // Next sequence number for this area
+  isArchived  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  jobPlans    JobPlan[]
+}
+
 enum JobPlanStatus {
   DRAFT
   READY
@@ -334,8 +347,13 @@ model JobPlan {
   redLightClearedById     String?
 
   // Step 2: Route Details
-  jobName         String
-  jobNumber       String?  // Internal job/project number
+  jobName         String   // Auto-generated: {prefix}-{MMYY}-{seq}
+  jobNumber       String?  // Internal job/project number (legacy, optional)
+  
+  // Project Area for standardized naming
+  projectAreaId   String?
+  projectArea     ProjectArea? @relation(fields: [projectAreaId], references: [id])
+  sequenceNumber  Int?     // Job's sequence within its project area
   locationName    String?  // Area name (e.g., "Oak Hills Phase 2")
   locationAddress String?  // Full address for navigation
   locationLat     Float?   // Latitude for map thumbnail

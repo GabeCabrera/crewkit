@@ -168,15 +168,35 @@ export function RouteStep({ job, updateJob, canEdit, onNavigate, refreshJob }: R
   // Calculate total footage for display
   const totalFootage = (job.aerialFootage || 0) + (job.undergroundFootage || 0) + (job.slackLoopFootage || 0);
 
+  // Check if this job uses standardized naming
+  const hasStandardizedName = !!job.projectAreaId;
+
   return (
     <div className="space-y-6">
       {/* ============================================ */}
       {/* IDENTITY HEADER */}
       {/* ============================================ */}
       <div className="space-y-4">
-        {/* Job Name - Click to Edit Title */}
+        {/* Job Name - Read-only for standardized jobs, editable for legacy */}
         <div className="pb-4 border-b border-slate-200">
-          {isEditingName ? (
+          {hasStandardizedName ? (
+            // Standardized job name - read only with project area badge
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                {job.projectArea && (
+                  <span className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">
+                    {job.projectArea.name}
+                  </span>
+                )}
+                <h1 className="text-2xl font-bold font-mono text-slate-900">
+                  {job.jobName}
+                </h1>
+              </div>
+              <p className="text-sm text-slate-500 mt-2">
+                {job.locationName || "Add a location description below"}
+              </p>
+            </div>
+          ) : isEditingName ? (
             <div className="flex items-center gap-2">
               <Input
                 ref={nameInputRef}
@@ -220,9 +240,11 @@ export function RouteStep({ job, updateJob, canEdit, onNavigate, refreshJob }: R
               )}
             </div>
           )}
-          <p className="text-sm text-slate-500 mt-1">
-            {job.locationName || job.jobNumber || "Define job details below"}
-          </p>
+          {!hasStandardizedName && (
+            <p className="text-sm text-slate-500 mt-1">
+              {job.locationName || job.jobNumber || "Define job details below"}
+            </p>
+          )}
         </div>
 
         {/* Job Number & Location - Side by Side */}
