@@ -33,6 +33,8 @@ import {
   MapPinned,
   Scale,
   Route,
+  ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
@@ -73,6 +75,7 @@ interface PermitsStepProps {
   updateJob: (updates: Partial<JobPlanData>) => void;
   refreshJob: () => Promise<void>;
   canEdit: boolean;
+  onNavigate?: (stepId: string) => void;
 }
 
 // Traffic Light Icon Component
@@ -144,7 +147,7 @@ function TrafficLightIcon({ cleared }: { cleared: boolean }) {
   );
 }
 
-export function PermitsStep({ job, updateJob, canEdit, refreshJob }: PermitsStepProps) {
+export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }: PermitsStepProps) {
   const [permitTypes, setPermitTypes] = useState<PermitType[]>([]);
   const [permits, setPermits] = useState<JobPermit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -669,6 +672,35 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob }: PermitsStep
           )}
         </div>
 
+        {/* Vetro Design Link Display */}
+        <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+          <div className="flex items-center gap-2 mb-2">
+            <FileCheck className="h-4 w-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-700">Design Source</span>
+          </div>
+          {job.vetroProjectUrl ? (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-slate-600 truncate">{job.vetroProjectUrl}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1.5 text-violet-700 border-violet-200 hover:bg-violet-50"
+                onClick={() => window.open(job.vetroProjectUrl!, "_blank")}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open in Vetro
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span className="text-sm">Add design link in Route Details first</span>
+            </div>
+          )}
+        </div>
+
         <div className="space-y-2">
           {/* Print Verification */}
           <div className="rounded-xl border border-slate-200 overflow-hidden">
@@ -989,6 +1021,21 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob }: PermitsStep
           )}
         </div>
       </div>
+
+      {/* ============================================ */}
+      {/* CONTINUE NAVIGATION */}
+      {/* ============================================ */}
+      {onNavigate && allCleared && (
+        <div className="pt-4 border-t border-slate-200">
+          <Button
+            onClick={() => onNavigate("materials")}
+            className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white gap-2"
+          >
+            Continue to Materials
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

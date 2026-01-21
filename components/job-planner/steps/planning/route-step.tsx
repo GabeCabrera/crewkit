@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, MapPin, Hash, FileText, Ruler, Milestone, Pencil, Check, X } from "lucide-react";
+import { ExternalLink, MapPin, Hash, FileText, Ruler, Milestone, Pencil, Check, X, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
 
@@ -12,9 +12,10 @@ interface RouteStepProps {
   job: JobPlanData;
   updateJob: (updates: Partial<JobPlanData>) => void;
   canEdit: boolean;
+  onNavigate?: (stepId: string) => void;
 }
 
-export function RouteStep({ job, updateJob, canEdit }: RouteStepProps) {
+export function RouteStep({ job, updateJob, canEdit, onNavigate }: RouteStepProps) {
   const hasVetroLink = job.vetroProjectUrl && job.vetroProjectUrl.trim() !== "";
   
   // Click-to-edit state for job name
@@ -266,6 +267,21 @@ export function RouteStep({ job, updateJob, canEdit }: RouteStepProps) {
           </div>
         </div>
       </div>
+
+      {/* ============================================ */}
+      {/* CONTINUE NAVIGATION */}
+      {/* ============================================ */}
+      {onNavigate && job.jobName && job.totalDistance > 0 && (
+        <div className="pt-4 border-t border-slate-200">
+          <Button
+            onClick={() => onNavigate("permits")}
+            className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white gap-2"
+          >
+            Continue to Red Light Check
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

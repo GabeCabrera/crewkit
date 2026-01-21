@@ -42,8 +42,8 @@ export const phases: { id: Phase; name: string; color: string }[] = [
 
 export const steps: Step[] = [
   // Planning Phase
-  { id: "permits", name: "Red Light Check", icon: ClipboardCheck, phase: "planning" },
   { id: "route", name: "Route Details", icon: MapPin, phase: "planning" },
+  { id: "permits", name: "Red Light Check", icon: ClipboardCheck, phase: "planning" },
   { id: "materials", name: "Materials", icon: Package, phase: "planning" },
   { id: "hazards", name: "Hazards", icon: AlertTriangle, phase: "planning" },
   { id: "crew", name: "Crew Assignment", icon: Users, phase: "planning" },

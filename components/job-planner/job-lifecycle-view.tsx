@@ -153,7 +153,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [currentStep, setCurrentStep] = useState("permits");
+  const [currentStep, setCurrentStep] = useState("route");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -450,9 +450,9 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
     switch (currentStep) {
       // Planning
       case "permits":
-        return <PermitsStep {...stepProps} />;
+        return <PermitsStep {...stepProps} onNavigate={handleStepChange} />;
       case "route":
-        return <RouteStep {...stepProps} />;
+        return <RouteStep {...stepProps} onNavigate={handleStepChange} />;
       case "materials":
         return <MaterialsStep {...stepProps} />;
       case "hazards":
