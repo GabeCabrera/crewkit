@@ -15,7 +15,6 @@ import {
 import {
   ExternalLink,
   MapPin,
-  Hash,
   FileText,
   Ruler,
   Milestone,
@@ -247,39 +246,24 @@ export function RouteStep({ job, updateJob, canEdit, onNavigate, refreshJob }: R
           )}
         </div>
 
-        {/* Job Number & Location - Side by Side */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="jobNumber" className="text-sm font-medium flex items-center gap-1.5">
-              <Hash className="h-3.5 w-3.5 text-slate-400" />
-              Job Number
-            </Label>
-            <Input
-              id="jobNumber"
-              type="text"
-              value={job.jobNumber || ""}
-              onChange={(e) => updateJob({ jobNumber: e.target.value })}
-              placeholder="e.g., JOB-2024-001"
-              className="h-11 rounded-lg"
-              disabled={!canEdit}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="locationName" className="text-sm font-medium flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-slate-400" />
-              Location / Area
-            </Label>
-            <Input
-              id="locationName"
-              type="text"
-              value={job.locationName || ""}
-              onChange={(e) => updateJob({ locationName: e.target.value })}
-              placeholder="e.g., Oak Hills Phase 2"
-              className="h-11 rounded-lg"
-              disabled={!canEdit}
-            />
-          </div>
+        {/* Location / Subdivision */}
+        <div className="space-y-2">
+          <Label htmlFor="locationName" className="text-sm font-medium flex items-center gap-1.5">
+            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+            Location / Subdivision
+          </Label>
+          <Input
+            id="locationName"
+            type="text"
+            value={job.locationName || ""}
+            onChange={(e) => updateJob({ locationName: e.target.value })}
+            placeholder="e.g., Oak Hills Phase 2"
+            className="h-11 rounded-lg"
+            disabled={!canEdit}
+          />
+          <p className="text-xs text-slate-500">
+            Specific location or subdivision within the project area
+          </p>
         </div>
       </div>
 
