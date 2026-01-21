@@ -71,6 +71,27 @@ export interface JobPlanData {
   easementsClear: boolean;
   // Dynamic permits
   permits?: JobPermit[];
+  
+  // Red Light Check - Zone A (Legal)
+  redLightDotPermit?: boolean;
+  redLightRowConfirmed?: boolean;
+  dotPermitNumber?: string | null;
+  rowConfirmationNotes?: string | null;
+  
+  // Red Light Check - Zone B (Safety)
+  redLightPowerLines?: boolean;
+  redLightTrafficControl?: boolean;
+  powerLineNotes?: string | null;
+  
+  // Red Light Check - Zone C (Design)
+  redLightPrintVerified?: boolean;
+  printVerificationNotes?: string | null;
+  
+  // Red Light Master Status
+  redLightCleared?: boolean;
+  redLightClearedAt?: string | null;
+  redLightClearedById?: string | null;
+  
   // Planning - Route
   jobName: string;
   jobNumber: string | null;
@@ -196,17 +217,27 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
     };
   }, [jobId]);
 
+  // Calculate Red Light cleared status
+  const calculateRedLightCleared = (jobData: JobPlanData): boolean => {
+    const zoneACleared = 
+      (jobData.redLightDotPermit ?? false) && 
+      (jobData.redLightRowConfirmed ?? false);
+    
+    const zoneBCleared = 
+      (jobData.redLightPowerLines ?? false) && 
+      (jobData.redLightTrafficControl ?? false);
+    
+    const zoneCCleared = jobData.redLightPrintVerified ?? false;
+    
+    return zoneACleared && zoneBCleared && zoneCCleared;
+  };
+
   // Calculate which steps are complete
   const calculateCompletedSteps = (jobData: JobPlanData) => {
     const completed = new Set<string>();
 
-    // Permits - all 4 must be checked
-    if (
-      jobData.rmpPermitApproved &&
-      jobData.sesdPermitApproved &&
-      jobData.makeReadyComplete &&
-      jobData.easementsClear
-    ) {
+    // Permits (Red Light Check) - all 5 checks must pass
+    if (calculateRedLightCleared(jobData)) {
       completed.add("permits");
     }
 
@@ -356,7 +387,17 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
     }
   }, [jobId]);
 
+  // Check if trying to navigate to a locked construction step
   const handleStepChange = (stepId: string) => {
+    // Get the step info
+    const stepInfo = steps.find(s => s.id === stepId);
+    
+    // Block navigation to construction steps if red light not cleared
+    if (stepInfo?.phase === "construction" && job && !calculateRedLightCleared(job)) {
+      // Could show a toast here, but the sidebar already shows the locked state
+      return;
+    }
+    
     setCurrentStep(stepId);
     setMobileMenuOpen(false);
   };
@@ -562,6 +603,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
             currentStep={currentStep}
             onStepChange={handleStepChange}
             completedSteps={completedSteps}
+            redLightCleared={calculateRedLightCleared(job)}
           />
         </aside>
 
@@ -578,6 +620,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
                   onStepChange={handleStepChange}
                   completedSteps={completedSteps}
                   jobName={job.jobName}
+                  redLightCleared={calculateRedLightCleared(job)}
                 />
               </div>
             </aside>

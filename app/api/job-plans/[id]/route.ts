@@ -227,6 +227,50 @@ export async function PATCH(
       updateData.status = "IN_PROGRESS";
     }
 
+    // Auto-compute Red Light Cleared status when any red light fields change
+    const redLightFields = [
+      'redLightDotPermit',
+      'redLightRowConfirmed',
+      'redLightPowerLines',
+      'redLightTrafficControl',
+      'redLightPrintVerified',
+    ];
+    
+    const hasRedLightUpdate = redLightFields.some(field => field in updateData);
+    
+    if (hasRedLightUpdate) {
+      // Merge existing values with updates to compute cleared status
+      const mergedRedLight = {
+        redLightDotPermit: updateData.redLightDotPermit ?? existingPlan.redLightDotPermit ?? false,
+        redLightRowConfirmed: updateData.redLightRowConfirmed ?? existingPlan.redLightRowConfirmed ?? false,
+        redLightPowerLines: updateData.redLightPowerLines ?? existingPlan.redLightPowerLines ?? false,
+        redLightTrafficControl: updateData.redLightTrafficControl ?? existingPlan.redLightTrafficControl ?? false,
+        redLightPrintVerified: updateData.redLightPrintVerified ?? existingPlan.redLightPrintVerified ?? false,
+      };
+      
+      const zoneACleared = mergedRedLight.redLightDotPermit && mergedRedLight.redLightRowConfirmed;
+      const zoneBCleared = mergedRedLight.redLightPowerLines && mergedRedLight.redLightTrafficControl;
+      const zoneCCleared = mergedRedLight.redLightPrintVerified;
+      
+      const isNowCleared = zoneACleared && zoneBCleared && zoneCCleared;
+      const wasPreviouslyCleared = existingPlan.redLightCleared ?? false;
+      
+      // Update cleared status
+      updateData.redLightCleared = isNowCleared;
+      
+      // Record when it was first cleared
+      if (isNowCleared && !wasPreviouslyCleared) {
+        updateData.redLightClearedAt = new Date();
+        updateData.redLightClearedById = session.user.id;
+      }
+      
+      // Clear the timestamp if it becomes un-cleared
+      if (!isNowCleared && wasPreviouslyCleared) {
+        updateData.redLightClearedAt = null;
+        updateData.redLightClearedById = null;
+      }
+    }
+
     const jobPlan = await prisma.jobPlan.update({
       where: { id },
       data: updateData,

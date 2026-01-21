@@ -21,6 +21,7 @@ import {
   Calculator,
   CheckCircle2,
   Circle,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +67,8 @@ interface JobPhaseSidebarProps {
   completedSteps?: Set<string>;
   jobName?: string;
   className?: string;
+  /** When false, construction tabs are disabled (Red Light Check not cleared) */
+  redLightCleared?: boolean;
 }
 
 export function JobPhaseSidebar({
@@ -74,6 +77,7 @@ export function JobPhaseSidebar({
   completedSteps = new Set(),
   jobName,
   className,
+  redLightCleared = true,
 }: JobPhaseSidebarProps) {
   const [expandedPhases, setExpandedPhases] = useState<Set<Phase>>(
     new Set<Phase>(["planning", "construction", "reporting"])
@@ -103,6 +107,11 @@ export function JobPhaseSidebar({
 
   const currentPhase = steps.find((s) => s.id === currentStep)?.phase;
 
+  // Check if a phase is locked (Construction requires Red Light clearance)
+  const isPhaseDisabled = (phase: Phase) => {
+    return phase === "construction" && !redLightCleared;
+  };
+
   return (
     <div className={cn("flex flex-col h-full", className)}>
       {/* Job Header */}
@@ -120,6 +129,7 @@ export function JobPhaseSidebar({
           const phaseSteps = getStepsForPhase(phase.id);
           const progress = getPhaseProgress(phase.id);
           const isActivePhase = currentPhase === phase.id;
+          const isDisabled = isPhaseDisabled(phase.id);
 
           return (
             <div key={phase.id} className="mb-1">
@@ -129,7 +139,8 @@ export function JobPhaseSidebar({
                 className={cn(
                   "w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors",
                   "hover:bg-slate-50",
-                  isActivePhase && "bg-slate-50"
+                  isActivePhase && "bg-slate-50",
+                  isDisabled && "opacity-60"
                 )}
               >
                 {isExpanded ? (
@@ -140,10 +151,23 @@ export function JobPhaseSidebar({
                 <span className={cn("font-semibold text-sm", phase.color)}>
                   {phase.name}
                 </span>
+                {isDisabled && (
+                  <Lock className="h-3.5 w-3.5 text-red-400 ml-1" />
+                )}
                 <span className="ml-auto text-xs text-slate-400">
                   {progress.completed}/{progress.total}
                 </span>
               </button>
+
+              {/* Locked Banner */}
+              {isDisabled && isExpanded && (
+                <div className="mx-4 mb-2 px-3 py-2 bg-red-50 border border-red-100 rounded-lg">
+                  <p className="text-xs text-red-600 font-medium flex items-center gap-1.5">
+                    <Lock className="h-3 w-3" />
+                    Complete Red Light Check to unlock
+                  </p>
+                </div>
+              )}
 
               {/* Steps */}
               {isExpanded && (
@@ -152,21 +176,28 @@ export function JobPhaseSidebar({
                     const Icon = step.icon;
                     const isActive = currentStep === step.id;
                     const isCompleted = completedSteps.has(step.id);
+                    const isStepDisabled = isDisabled;
 
                     return (
                       <button
                         key={step.id}
-                        onClick={() => onStepChange(step.id)}
+                        onClick={() => !isStepDisabled && onStepChange(step.id)}
+                        disabled={isStepDisabled}
+                        title={isStepDisabled ? "Complete Red Light Check to unlock" : undefined}
                         className={cn(
                           "w-full flex items-center gap-3 px-4 py-2 text-left transition-colors",
-                          "hover:bg-slate-50 text-sm",
-                          isActive && "bg-orange-50 border-l-2 border-orange-500 -ml-[1px]",
-                          !isActive && "ml-0"
+                          "text-sm",
+                          !isStepDisabled && "hover:bg-slate-50",
+                          isActive && !isStepDisabled && "bg-orange-50 border-l-2 border-orange-500 -ml-[1px]",
+                          !isActive && "ml-0",
+                          isStepDisabled && "opacity-40 cursor-not-allowed"
                         )}
                       >
                         {/* Status Indicator */}
                         <div className="relative">
-                          {isCompleted ? (
+                          {isStepDisabled ? (
+                            <Lock className="h-4 w-4 text-slate-300" />
+                          ) : isCompleted ? (
                             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                           ) : isActive ? (
                             <div className="h-4 w-4 rounded-full border-2 border-orange-500 bg-orange-500" />
@@ -179,7 +210,11 @@ export function JobPhaseSidebar({
                         <Icon
                           className={cn(
                             "h-4 w-4",
-                            isActive ? "text-orange-600" : "text-slate-400"
+                            isStepDisabled 
+                              ? "text-slate-300" 
+                              : isActive 
+                                ? "text-orange-600" 
+                                : "text-slate-400"
                           )}
                         />
 
@@ -187,11 +222,13 @@ export function JobPhaseSidebar({
                         <span
                           className={cn(
                             "flex-1 truncate",
-                            isActive
-                              ? "font-medium text-orange-900"
-                              : isCompleted
-                              ? "text-slate-600"
-                              : "text-slate-500"
+                            isStepDisabled
+                              ? "text-slate-400"
+                              : isActive
+                                ? "font-medium text-orange-900"
+                                : isCompleted
+                                  ? "text-slate-600"
+                                  : "text-slate-500"
                           )}
                         >
                           {step.name}

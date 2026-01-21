@@ -187,6 +187,13 @@ export interface JobForStatusValidation {
   sesdPermitApproved?: boolean;
   makeReadyComplete?: boolean;
   easementsClear?: boolean;
+  // Red Light Check fields
+  redLightDotPermit?: boolean;
+  redLightRowConfirmed?: boolean;
+  redLightPowerLines?: boolean;
+  redLightTrafficControl?: boolean;
+  redLightPrintVerified?: boolean;
+  redLightCleared?: boolean;
   // New dynamic permits
   permits?: PermitForValidation[];
   // Route info
@@ -200,9 +207,29 @@ export interface JobForStatusValidation {
   assignments?: { id: string }[];
 }
 
+// Check if Red Light Check is cleared (new system)
+export function isRedLightCleared(job: JobForStatusValidation): boolean {
+  const zoneACleared = (job.redLightDotPermit ?? false) && (job.redLightRowConfirmed ?? false);
+  const zoneBCleared = (job.redLightPowerLines ?? false) && (job.redLightTrafficControl ?? false);
+  const zoneCCleared = job.redLightPrintVerified ?? false;
+  return zoneACleared && zoneBCleared && zoneCCleared;
+}
+
 // Check if all permits are verified
-// Uses new dynamic permits if available, falls back to legacy boolean fields
+// Uses Red Light Check if available, then dynamic permits, falls back to legacy boolean fields
 export function hasAllPermitsVerified(job: JobForStatusValidation): boolean {
+  // First, check if Red Light Check fields are set (new system)
+  const hasRedLightFields = 
+    job.redLightDotPermit !== undefined || 
+    job.redLightRowConfirmed !== undefined ||
+    job.redLightPowerLines !== undefined ||
+    job.redLightTrafficControl !== undefined ||
+    job.redLightPrintVerified !== undefined;
+  
+  if (hasRedLightFields) {
+    return isRedLightCleared(job);
+  }
+  
   // If job has dynamic permits, use those
   if (job.permits && job.permits.length > 0) {
     return job.permits.every(permit => permit.isApproved);
@@ -372,11 +399,31 @@ export const updateJobPlanSchema = z.object({
   tangents: z.number().int().min(0).optional(),
   anchors: z.number().int().min(0).optional(),
   
-  // Permits
+  // Legacy Permits (kept for backwards compatibility)
   rmpPermitApproved: z.boolean().optional(),
   sesdPermitApproved: z.boolean().optional(),
   makeReadyComplete: z.boolean().optional(),
   easementsClear: z.boolean().optional(),
+  
+  // Red Light Check - Zone A (Legal)
+  redLightDotPermit: z.boolean().optional(),
+  redLightRowConfirmed: z.boolean().optional(),
+  dotPermitNumber: z.string().max(100).optional().nullable(),
+  rowConfirmationNotes: z.string().max(2000).optional().nullable(),
+  
+  // Red Light Check - Zone B (Safety)
+  redLightPowerLines: z.boolean().optional(),
+  redLightTrafficControl: z.boolean().optional(),
+  powerLineNotes: z.string().max(2000).optional().nullable(),
+  
+  // Red Light Check - Zone C (Design)
+  redLightPrintVerified: z.boolean().optional(),
+  printVerificationNotes: z.string().max(2000).optional().nullable(),
+  
+  // Red Light Master Status (auto-computed, but can be overridden)
+  redLightCleared: z.boolean().optional(),
+  redLightClearedAt: z.string().datetime().optional().nullable(),
+  redLightClearedById: z.string().cuid().optional().nullable(),
   
   // Hazards
   trafficControl: z.boolean().optional(),

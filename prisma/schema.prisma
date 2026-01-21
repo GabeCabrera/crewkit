@@ -305,11 +305,33 @@ model JobPlan {
 
   // ========== PLANNING PHASE ==========
 
-  // Step 1: Permits (Red Light Check)
+  // Step 1: Permits (Legacy - kept for backwards compatibility)
   rmpPermitApproved  Boolean @default(false)
   sesdPermitApproved Boolean @default(false)
   makeReadyComplete  Boolean @default(false)
   easementsClear     Boolean @default(false)
+
+  // ========== RED LIGHT CHECK (Safety Gate) ==========
+  
+  // Zone A: Legal & Permitting
+  redLightDotPermit       Boolean  @default(false)
+  redLightRowConfirmed    Boolean  @default(false)
+  dotPermitNumber         String?
+  rowConfirmationNotes    String?
+
+  // Zone B: Safety (Life Savers)
+  redLightPowerLines      Boolean  @default(false)
+  redLightTrafficControl  Boolean  @default(false)
+  powerLineNotes          String?
+
+  // Zone C: Design
+  redLightPrintVerified   Boolean  @default(false)
+  printVerificationNotes  String?
+
+  // Master gate status (computed but cached for queries)
+  redLightCleared         Boolean   @default(false)
+  redLightClearedAt       DateTime?
+  redLightClearedById     String?
 
   // Step 2: Route Details
   jobName         String
