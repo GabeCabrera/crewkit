@@ -388,9 +388,31 @@ export const updateJobPlanSchema = z.object({
   jobName: z.string().min(1).max(200).optional(),
   jobNumber: z.string().max(50).optional().nullable(),
   locationName: z.string().max(200).optional().nullable(),
+  locationAddress: z.string().max(500).optional().nullable(),
+  locationLat: z.number().min(-90).max(90).optional().nullable(),
+  locationLng: z.number().min(-180).max(180).optional().nullable(),
   vetroProjectUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
+  
+  // Build Spec
+  primaryMethod: z.enum(["aerial", "underground", "both"]).optional().nullable(),
+  constructionType: z.enum(["new_strand", "overlash", "adss", "ug_dip"]).optional().nullable(),
+  cableProfile: z.string().max(100).optional().nullable(),
+  sagTensionSpec: z.string().max(200).optional().nullable(),
+  
+  // Scope Breakdown
   totalDistance: z.number().min(0).optional(),
+  aerialFootage: z.number().min(0).optional(),
+  undergroundFootage: z.number().min(0).optional(),
+  slackLoopFootage: z.number().min(0).optional(),
   poleCount: z.number().int().min(0).optional(),
+  makeReadyRequired: z.boolean().optional(),
+  
+  // Access & Logistics
+  gateCode: z.string().max(100).optional().nullable(),
+  poleOwner: z.string().max(200).optional().nullable(),
+  trafficControlTier: z.enum(["none", "cones", "flaggers"]).optional().nullable(),
+  siteContactName: z.string().max(100).optional().nullable(),
+  siteContactPhone: z.string().max(50).optional().nullable(),
   
   // Materials
   strandFootage: z.number().min(0).optional(),

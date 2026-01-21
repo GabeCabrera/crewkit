@@ -70,6 +70,9 @@ export async function GET(
           },
           orderBy: { createdAt: "asc" },
         },
+        constructionPrints: {
+          orderBy: { uploadedAt: "desc" },
+        },
         comments: {
           where: { parentId: null }, // Only top-level comments
           include: {

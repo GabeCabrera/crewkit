@@ -337,9 +337,31 @@ model JobPlan {
   jobName         String
   jobNumber       String?  // Internal job/project number
   locationName    String?  // Area name (e.g., "Oak Hills Phase 2")
+  locationAddress String?  // Full address for navigation
+  locationLat     Float?   // Latitude for map thumbnail
+  locationLng     Float?   // Longitude for map thumbnail
   vetroProjectUrl String?  // Link to Vetro FiberMap project
-  totalDistance   Float    // Total footage (from Vetro)
-  poleCount       Int      @default(0) // Number of poles in job
+  
+  // Build Spec
+  primaryMethod      String?  // "aerial" | "underground" | "both"
+  constructionType   String?  // "new_strand" | "overlash" | "adss" | "ug_dip"
+  cableProfile       String?  // e.g., "144ct Loose Tube"
+  sagTensionSpec     String?  // e.g., "NESC Heavy"
+  
+  // Scope Breakdown
+  totalDistance      Float    // Legacy: Total footage (computed from breakdown)
+  aerialFootage      Float    @default(0)  // Aerial construction footage
+  undergroundFootage Float    @default(0)  // Underground/riser footage
+  slackLoopFootage   Float    @default(0)  // Slack loop footage
+  poleCount          Int      @default(0)  // Number of poles in job
+  makeReadyRequired  Boolean  @default(false) // Requires make-ready work first
+  
+  // Access & Logistics
+  gateCode           String?  // Gate codes, lockbox info
+  poleOwner          String?  // e.g., "Rocky Mountain Power"
+  trafficControlTier String?  // "none" | "cones" | "flaggers"
+  siteContactName    String?  // On-site contact name
+  siteContactPhone   String?  // On-site contact phone
 
   // Step 3: Materials (Planned)
   strandFootage Float
@@ -411,6 +433,9 @@ model JobPlan {
 
   // Dynamic permits system
   permits JobPermit[]
+  
+  // Construction prints (PDFs)
+  constructionPrints ConstructionPrint[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -596,4 +621,22 @@ model PermitDocument {
   uploadedAt   DateTime  @default(now())
 
   @@index([jobPermitId])
+}
+
+// ============================================================
+// CONSTRUCTION PRINTS (Route Details PDFs)
+// ============================================================
+
+model ConstructionPrint {
+  id           String   @id @default(cuid())
+  jobPlanId    String
+  jobPlan      JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileUrl      String
+  fileType     String   // "application/pdf", "image/jpeg", etc.
+  fileSize     Int      // bytes
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+
+  @@index([jobPlanId])
 }

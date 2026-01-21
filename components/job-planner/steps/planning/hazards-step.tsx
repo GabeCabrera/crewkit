@@ -3,7 +3,7 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Car, TreePine, Bug, Waves } from "lucide-react";
+import { TreePine, Bug, Waves } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
 
@@ -14,8 +14,8 @@ interface HazardsStepProps {
 }
 
 export function HazardsStep({ job, updateJob, canEdit }: HazardsStepProps) {
+  // Traffic Control is now managed in Route Details > Access & Logistics
   const hazards = [
-    { id: "trafficControl", label: "Traffic Control Required", icon: Car, checked: job.trafficControl },
     { id: "treeTrimming", label: "Tree Trimming Required", icon: TreePine, checked: job.treeTrimming },
     { id: "animalHazards", label: "Animal Hazards", icon: Bug, checked: job.animalHazards },
     { id: "waterRailCrossing", label: "Water/Rail Crossing", icon: Waves, checked: job.waterRailCrossing },

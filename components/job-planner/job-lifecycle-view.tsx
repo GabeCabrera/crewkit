@@ -96,9 +96,41 @@ export interface JobPlanData {
   jobName: string;
   jobNumber: string | null;
   locationName: string | null;
+  locationAddress: string | null;
+  locationLat: number | null;
+  locationLng: number | null;
   vetroProjectUrl: string | null;
-  totalDistance: number;
+  
+  // Build Spec
+  primaryMethod: string | null;     // "aerial" | "underground" | "both"
+  constructionType: string | null;  // "new_strand" | "overlash" | "adss" | "ug_dip"
+  cableProfile: string | null;      // e.g., "144ct Loose Tube"
+  sagTensionSpec: string | null;    // e.g., "NESC Heavy"
+  
+  // Scope Breakdown
+  totalDistance: number;            // Legacy/computed total
+  aerialFootage: number;
+  undergroundFootage: number;
+  slackLoopFootage: number;
   poleCount: number;
+  makeReadyRequired: boolean;
+  
+  // Access & Logistics
+  gateCode: string | null;
+  poleOwner: string | null;
+  trafficControlTier: string | null;  // "none" | "cones" | "flaggers"
+  siteContactName: string | null;
+  siteContactPhone: string | null;
+  
+  // Construction Prints
+  constructionPrints?: Array<{
+    id: string;
+    fileName: string;
+    fileUrl: string;
+    fileSize: number;
+    uploadedAt: string;
+  }>;
+  
   // Planning - Materials
   strandFootage: number;
   fiberFootage: number;
