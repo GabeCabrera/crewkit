@@ -191,9 +191,11 @@ export function RouteStep({ job, updateJob, canEdit, onNavigate, refreshJob }: R
                   {job.jobName}
                 </h1>
               </div>
-              <p className="text-sm text-slate-500 mt-2">
-                {job.locationName || "Add a location description below"}
-              </p>
+              {job.locationName && (
+                <p className="text-sm text-slate-500 mt-2">
+                  {job.locationName}
+                </p>
+              )}
             </div>
           ) : isEditingName ? (
             <div className="flex items-center gap-2">
@@ -244,26 +246,6 @@ export function RouteStep({ job, updateJob, canEdit, onNavigate, refreshJob }: R
               {job.locationName || job.jobNumber || "Define job details below"}
             </p>
           )}
-        </div>
-
-        {/* Location / Subdivision */}
-        <div className="space-y-2">
-          <Label htmlFor="locationName" className="text-sm font-medium flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 text-slate-400" />
-            Location / Subdivision
-          </Label>
-          <Input
-            id="locationName"
-            type="text"
-            value={job.locationName || ""}
-            onChange={(e) => updateJob({ locationName: e.target.value })}
-            placeholder="e.g., Oak Hills Phase 2"
-            className="h-11 rounded-lg"
-            disabled={!canEdit}
-          />
-          <p className="text-xs text-slate-500">
-            Specific location or subdivision within the project area
-          </p>
         </div>
       </div>
 
