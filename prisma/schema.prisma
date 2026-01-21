@@ -28,7 +28,6 @@ enum UnitType {
   OTHER
 }
 
-
 enum AssemblyStatus {
   DRAFT
   PENDING_APPROVAL
@@ -37,67 +36,67 @@ enum AssemblyStatus {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  name          String?
-  password      String
-  role          UserRole @default(FIELD)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  teamId        String?
-  team          Team?    @relation(fields: [teamId], references: [id])
-  equipmentLogs EquipmentLog[]
-  assemblies    Assembly[]
-  assemblyUsageLogs AssemblyUsageLog[]
-  createdTeams  Team[]   @relation("TeamCreator")
-  createdReports EndOfDayReport[] @relation("ReportCreator")
-  createdFieldReports FieldWorkLog[] @relation("FieldReportCreator")
-  
+  id                  String             @id @default(cuid())
+  email               String             @unique
+  name                String?
+  password            String
+  role                UserRole           @default(FIELD)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  teamId              String?
+  team                Team?              @relation(fields: [teamId], references: [id])
+  equipmentLogs       EquipmentLog[]
+  assemblies          Assembly[]
+  assemblyUsageLogs   AssemblyUsageLog[]
+  createdTeams        Team[]             @relation("TeamCreator")
+  createdReports      EndOfDayReport[]   @relation("ReportCreator")
+  createdFieldReports FieldWorkLog[]     @relation("FieldReportCreator")
+
   // Job Planning relations
-  createdJobPlans   JobPlan[]       @relation("JobPlanCreator")
-  jobAssignments    JobAssignment[] @relation("JobAssignee")
-  createdAssignments JobAssignment[] @relation("AssignmentCreator")
-  comments          Comment[]
-  notifications     Notification[]
-  permitDocuments   PermitDocument[] @relation("DocumentUploader")
+  createdJobPlans    JobPlan[]        @relation("JobPlanCreator")
+  jobAssignments     JobAssignment[]  @relation("JobAssignee")
+  createdAssignments JobAssignment[]  @relation("AssignmentCreator")
+  comments           Comment[]
+  notifications      Notification[]
+  permitDocuments    PermitDocument[] @relation("DocumentUploader")
 }
 
 model Team {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  creatorId String
-  creator   User     @relation("TeamCreator", fields: [creatorId], references: [id])
-  members   User[]
-  reports   EndOfDayReport[]
+  id           String           @id @default(cuid())
+  name         String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  creatorId    String
+  creator      User             @relation("TeamCreator", fields: [creatorId], references: [id])
+  members      User[]
+  reports      EndOfDayReport[]
   fieldReports FieldWorkLog[]
 }
 
 model Equipment {
-  id            String    @id @default(cuid())
+  id            String         @id @default(cuid())
   name          String
-  sku           String    @unique
+  sku           String         @unique
   description   String?
-  pricePerUnit  Float     @default(0)
-  unitType      UnitType  @default(UNIT)
+  pricePerUnit  Float          @default(0)
+  unitType      UnitType       @default(UNIT)
   photoUrl      String?
-  boxheroId     Int?      @unique
+  boxheroId     Int?           @unique
   lastSyncedAt  DateTime?
-  isArchived    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  isArchived    Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   inventory     Inventory?
   assemblyItems AssemblyItem[]
   equipmentLogs EquipmentLog[]
 }
 
 model Inventory {
-  id          String   @id @default(cuid())
-  equipmentId String   @unique
+  id          String    @id @default(cuid())
+  equipmentId String    @unique
   equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
-  quantity    Int      @default(0)
-  updatedAt   DateTime @updatedAt
+  quantity    Int       @default(0)
+  updatedAt   DateTime  @updatedAt
 }
 
 model AssemblyCategory {
@@ -107,55 +106,55 @@ model AssemblyCategory {
   order       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  types       AssemblyType[]
-  assemblies  Assembly[]
+
+  types      AssemblyType[]
+  assemblies Assembly[]
 }
 
 model AssemblyType {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
   name        String
   description String?
-  order       Int      @default(0)
+  order       Int              @default(0)
   categoryId  String
   category    AssemblyCategory @relation(fields: [categoryId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  assemblies  Assembly[]
-  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  assemblies Assembly[]
+
   @@unique([name, categoryId])
 }
 
 model Assembly {
-  id          String          @id @default(cuid())
+  id          String             @id @default(cuid())
   name        String
   description String?
-  status      AssemblyStatus  @default(DRAFT)
-  categories  String[]        @default([])  // DEPRECATED: kept for migration
+  status      AssemblyStatus     @default(DRAFT)
+  categories  String[]           @default([]) // DEPRECATED: kept for migration
   categoryId  String?
-  category    AssemblyCategory? @relation(fields: [categoryId], references: [id])
+  category    AssemblyCategory?  @relation(fields: [categoryId], references: [id])
   typeId      String?
-  type        AssemblyType? @relation(fields: [typeId], references: [id])
+  type        AssemblyType?      @relation(fields: [typeId], references: [id])
   createdById String
-  createdBy   User            @relation(fields: [createdById], references: [id])
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime         @updatedAt
+  createdBy   User               @relation(fields: [createdById], references: [id])
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   items       AssemblyItem[]
   usageLogs   AssemblyUsageLog[]
-  
+
   @@index([categoryId])
   @@index([typeId])
 }
 
 model AssemblyItem {
-  id         String   @id @default(cuid())
-  assemblyId String
-  assembly   Assembly @relation(fields: [assemblyId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  assemblyId  String
+  assembly    Assembly  @relation(fields: [assemblyId], references: [id], onDelete: Cascade)
   equipmentId String
-  equipment  Equipment @relation(fields: [equipmentId], references: [id])
-  quantity   Int
-  createdAt  DateTime @default(now())
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  quantity    Int
+  createdAt   DateTime  @default(now())
 }
 
 model AssemblyUsageLog {
@@ -165,117 +164,117 @@ model AssemblyUsageLog {
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   quantity   Int      @default(1)
-  modifiers  Json?    // Store extra equipment as JSON
+  modifiers  Json? // Store extra equipment as JSON
   date       DateTime @default(now())
   createdAt  DateTime @default(now())
 }
 
 model EquipmentLog {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   equipmentId String
   equipment   Equipment @relation(fields: [equipmentId], references: [id])
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  quantity    Int      // Positive for add, negative for remove
-  type        String   // "ADD", "REMOVE", "USED", "RETURNED"
+  user        User      @relation(fields: [userId], references: [id])
+  quantity    Int // Positive for add, negative for remove
+  type        String // "ADD", "REMOVE", "USED", "RETURNED"
   notes       String?
-  date        DateTime @default(now())
-  createdAt   DateTime @default(now())
+  date        DateTime  @default(now())
+  createdAt   DateTime  @default(now())
 }
 
 model EndOfDayReport {
-  id            String   @id @default(cuid())
-  date          DateTime @db.Date
-  teamId        String
-  team          Team     @relation(fields: [teamId], references: [id])
-  createdById   String
-  createdBy     User     @relation("ReportCreator", fields: [createdById], references: [id])
-  
+  id          String   @id @default(cuid())
+  date        DateTime @db.Date
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id])
+  createdById String
+  createdBy   User     @relation("ReportCreator", fields: [createdById], references: [id])
+
   // Manager selects who worked
-  workersPresent  String[]  // Array of user IDs
-  
+  workersPresent String[] // Array of user IDs
+
   // Auto-calculated summaries (stored for historical record)
-  totalAssembliesUsed  Int
-  totalItemsConsumed   Int
-  totalFiberFootage    Float?
-  
+  totalAssembliesUsed Int
+  totalItemsConsumed  Int
+  totalFiberFootage   Float?
+
   // Manager input
-  notes         String?
-  issues        String?
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
+  notes  String?
+  issues String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Field work logs for this report
   fieldWorkLogs FieldWorkLog[]
-  
-  @@unique([date, teamId])  // One report per team per day
+
+  @@unique([date, teamId]) // One report per team per day
 }
 
 // System settings (singleton pattern - only one row)
 model SystemSettings {
-  id              String   @id @default("settings")
-  companyName     String   @default("CrewKit")
-  updatedAt       DateTime @updatedAt
-  updatedById     String?
+  id          String   @id @default("settings")
+  companyName String   @default("CrewKit")
+  updatedAt   DateTime @updatedAt
+  updatedById String?
 }
 
 // Detailed field work log for construction activities
 model FieldWorkLog {
-  id              String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Basic info
-  date            DateTime @db.Date
-  location        String              // Where work was performed
-  workersNames    String[]            // Names of workers (stored as strings for flexibility)
-  workerCount     Int       @default(0)
-  hoursWorked     Float     @default(0)
-  
+  date         DateTime @db.Date
+  location     String // Where work was performed
+  workersNames String[] // Names of workers (stored as strings for flexibility)
+  workerCount  Int      @default(0)
+  hoursWorked  Float    @default(0)
+
   // Team and user tracking
-  teamId          String?
-  team            Team?    @relation(fields: [teamId], references: [id])
-  createdById     String?
-  createdBy       User?    @relation("FieldReportCreator", fields: [createdById], references: [id])
-  
+  teamId      String?
+  team        Team?   @relation(fields: [teamId], references: [id])
+  createdById String?
+  createdBy   User?   @relation("FieldReportCreator", fields: [createdById], references: [id])
+
   // Aerial construction metrics
-  strandHungFootage     Float?    // Strand hung (feet)
-  polesAttached         Int?      // Number of poles attached to
-  fiberLashedFootage    Float?    // Fiber lashed (feet)
-  fiberPulledFootage    Float?    // Fiber pulled (feet)
-  
+  strandHungFootage  Float? // Strand hung (feet)
+  polesAttached      Int? // Number of poles attached to
+  fiberLashedFootage Float? // Fiber lashed (feet)
+  fiberPulledFootage Float? // Fiber pulled (feet)
+
   // Underground construction metrics
-  drilledFootage        Float?    // Directional drilling (feet)
-  plowedFootage         Float?    // Plowed conduit (feet)
-  trenchedFootage       Float?    // Open trench (feet)
-  conduitPlacedFootage  Float?    // Conduit placed (feet)
-  conduitSize           String?   // Conduit size (e.g., "1.25\"", "2\"")
-  
+  drilledFootage       Float? // Directional drilling (feet)
+  plowedFootage        Float? // Plowed conduit (feet)
+  trenchedFootage      Float? // Open trench (feet)
+  conduitPlacedFootage Float? // Conduit placed (feet)
+  conduitSize          String? // Conduit size (e.g., "1.25\"", "2\"")
+
   // Infrastructure placed
-  handholesPlaced       Int?      // Handholes placed
-  vaultsPlaced          Int?      // Vaults placed
-  mstsInstalled         Int?      // MSTs (Mid-Span Terminals) installed
-  guysPlaced            Int?      // Guy wires/anchors placed
-  slackLoops            Int?      // Slack loops installed
-  risersInstalled       Int?      // Risers installed
-  spliceCases           Int?      // Splice cases installed
-  anchorsPlaced         Int?      // Anchors placed
-  snowshoesPlaced       Int?      // Snowshoes placed
-  
+  handholesPlaced Int? // Handholes placed
+  vaultsPlaced    Int? // Vaults placed
+  mstsInstalled   Int? // MSTs (Mid-Span Terminals) installed
+  guysPlaced      Int? // Guy wires/anchors placed
+  slackLoops      Int? // Slack loops installed
+  risersInstalled Int? // Risers installed
+  spliceCases     Int? // Splice cases installed
+  anchorsPlaced   Int? // Anchors placed
+  snowshoesPlaced Int? // Snowshoes placed
+
   // Notes and issues
-  notes           String?
-  issues          String?             // Issues/blockers encountered
-  submittedBy     String              // Name of person who submitted
-  
+  notes       String?
+  issues      String? // Issues/blockers encountered
+  submittedBy String // Name of person who submitted
+
   // Optional link to EOD report (deprecated, kept for migration)
-  reportId        String?
-  report          EndOfDayReport? @relation(fields: [reportId], references: [id])
-  
+  reportId String?
+  report   EndOfDayReport? @relation(fields: [reportId], references: [id])
+
   // Original timestamp from import
   originalTimestamp DateTime?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([date])
   @@index([location])
   @@index([teamId])
@@ -302,125 +301,100 @@ enum JobPriority {
 }
 
 model JobPlan {
-  id                  String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // ========== PLANNING PHASE ==========
-  
+
   // Step 1: Permits (Red Light Check)
-  rmpPermitApproved   Boolean  @default(false)
-  sesdPermitApproved  Boolean  @default(false)
-  makeReadyComplete   Boolean  @default(false)
-  easementsClear      Boolean  @default(false)
-  
+  rmpPermitApproved  Boolean @default(false)
+  sesdPermitApproved Boolean @default(false)
+  makeReadyComplete  Boolean @default(false)
+  easementsClear     Boolean @default(false)
+
   // Step 2: Route Details
-  jobName             String
-  startPoleId         String
-  endPoleId           String
-  totalDistance       Float
-  
+  jobName         String
+  jobNumber       String?  // Internal job/project number
+  locationName    String?  // Area name (e.g., "Oak Hills Phase 2")
+  vetroProjectUrl String?  // Link to Vetro FiberMap project
+  totalDistance   Float    // Total footage (from Vetro)
+  poleCount       Int      @default(0) // Number of poles in job
+
   // Step 3: Materials (Planned)
-  strandFootage       Float
-  fiberFootage        Float
-  deadEnds            Int      @default(0)
-  tangents            Int      @default(0)
-  anchors             Int      @default(0)
-  
+  strandFootage Float
+  fiberFootage  Float
+  deadEnds      Int   @default(0)
+  tangents      Int   @default(0)
+  anchors       Int   @default(0)
+
   // Step 4: Hazards
-  trafficControl      Boolean  @default(false)
-  treeTrimming        Boolean  @default(false)
-  animalHazards       Boolean  @default(false)
-  waterRailCrossing   Boolean  @default(false)
-  foremanNotes        String?
-  
+  trafficControl    Boolean @default(false)
+  treeTrimming      Boolean @default(false)
+  animalHazards     Boolean @default(false)
+  waterRailCrossing Boolean @default(false)
+  foremanNotes      String?
+
   // Step 5: Crew Assignment (handled via JobAssignment relation)
-  
+
   // Step 6: Scheduling
-  plannedStartDate    DateTime?
-  plannedEndDate      DateTime?
-  estimatedDuration   Float?    // in hours or days
-  durationUnit        String?   // "hours" or "days"
-  
+  plannedStartDate  DateTime?
+  plannedEndDate    DateTime?
+  estimatedDuration Float? // in hours or days
+  durationUnit      String? // "hours" or "days"
+
   // ========== CONSTRUCTION PHASE (Cumulative Totals) ==========
-  
+
   // Actual progress totals (updated from daily logs)
-  actualFootage       Float     @default(0)
-  actualPolesComplete Int       @default(0)
-  
+  actualFootage       Float @default(0)
+  actualPolesComplete Int   @default(0)
+
   // Actual materials used (updated from daily logs)
-  actualStrandUsed    Float     @default(0)
-  actualFiberUsed     Float     @default(0)
-  actualDeadEnds      Int       @default(0)
-  actualTangents      Int       @default(0)
-  actualAnchors       Int       @default(0)
-  
+  actualStrandUsed Float @default(0)
+  actualFiberUsed  Float @default(0)
+  actualDeadEnds   Int   @default(0)
+  actualTangents   Int   @default(0)
+  actualAnchors    Int   @default(0)
+
   // Crew hours total
-  totalCrewHours      Float     @default(0)
-  
+  totalCrewHours Float @default(0)
+
   // ========== REPORTING PHASE ==========
-  
+
   // Sign-off
-  foremanSignoff      Boolean   @default(false)
-  signoffDate         DateTime?
-  signoffById         String?
-  
+  foremanSignoff Boolean   @default(false)
+  signoffDate    DateTime?
+  signoffById    String?
+
   // Lessons learned
-  lessonsLearned      String?
-  
+  lessonsLearned String?
+
   // Completion
-  completedAt         DateTime?
-  
+  completedAt DateTime?
+
   // ========== STATUS & METADATA ==========
-  
-  status              JobPlanStatus @default(DRAFT)
-  priority            JobPriority   @default(MEDIUM)
-  
+
+  status   JobPlanStatus @default(DRAFT)
+  priority JobPriority   @default(MEDIUM)
+
   // Relationships
-  createdById         String
-  createdBy           User     @relation("JobPlanCreator", fields: [createdById], references: [id])
-  assignments         JobAssignment[]
-  comments            Comment[]
-  
+  createdById String
+  createdBy   User            @relation("JobPlanCreator", fields: [createdById], references: [id])
+  assignments JobAssignment[]
+  comments    Comment[]
+
   // Construction logs
-  progressLogs        DailyProgressLog[]
-  materialLogs        MaterialUsageLog[]
-  crewHoursLogs       CrewHoursLog[]
-  issueLogs           IssueLog[]
-  
+  progressLogs  DailyProgressLog[]
+  materialLogs  MaterialUsageLog[]
+  crewHoursLogs CrewHoursLog[]
+  issueLogs     IssueLog[]
+
   // Dynamic permits system
-  permits             JobPermit[]
-  
-  // ========== MAP DATA ==========
-  mapCenter           Json?     // { lat: number, lng: number }
-  mapZoom             Int?      // Default zoom level
-  mapLayers           JobMapLayer[]
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
+  permits JobPermit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([status])
   @@index([createdById])
-}
-
-// ============================================================
-// JOB MAP LAYERS
-// ============================================================
-
-model JobMapLayer {
-  id          String   @id @default(cuid())
-  jobPlanId   String
-  jobPlan     JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
-  name        String
-  type        String   // "kmz", "kml", "geojson", "image_overlay", "drawn"
-  fileUrl     String?  // Vercel Blob URL for uploaded files
-  geoJson     Json?    // Parsed GeoJSON data
-  bounds      Json?    // For image overlays: [[south, west], [north, east]]
-  opacity     Float    @default(1.0)
-  visible     Boolean  @default(true)
-  zIndex      Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([jobPlanId])
 }
 
 // ============================================================
@@ -438,7 +412,7 @@ model DailyProgressLog {
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@index([jobPlanId])
   @@index([date])
 }
@@ -457,7 +431,7 @@ model MaterialUsageLog {
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@index([jobPlanId])
   @@index([date])
 }
@@ -468,13 +442,13 @@ model CrewHoursLog {
   jobPlan     JobPlan  @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
   date        DateTime @db.Date
   userId      String
-  userName    String?  // Store name for display even if user deleted
+  userName    String? // Store name for display even if user deleted
   hours       Float
   notes       String?
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@index([jobPlanId])
   @@index([date])
   @@index([userId])
@@ -498,7 +472,7 @@ model IssueLog {
   createdById String
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
-  
+
   @@index([jobPlanId])
   @@index([date])
   @@index([resolved])
@@ -513,25 +487,25 @@ model JobAssignment {
   assignedById String
   assignedBy   User     @relation("AssignmentCreator", fields: [assignedById], references: [id])
   createdAt    DateTime @default(now())
-  
+
   @@unique([jobPlanId, userId])
   @@index([userId])
 }
 
 model Comment {
-  id          String    @id @default(cuid())
-  content     String
-  jobPlanId   String
-  jobPlan     JobPlan   @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
-  authorId    String
-  author      User      @relation(fields: [authorId], references: [id])
-  parentId    String?
-  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies     Comment[] @relation("CommentReplies")
-  mentions    String[]  // Array of user IDs mentioned
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  id        String    @id @default(cuid())
+  content   String
+  jobPlanId String
+  jobPlan   JobPlan   @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  mentions  String[] // Array of user IDs mentioned
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
   @@index([jobPlanId])
   @@index([parentId])
 }
@@ -543,16 +517,16 @@ enum NotificationType {
 }
 
 model Notification {
-  id          String           @id @default(cuid())
-  type        NotificationType
-  userId      String
-  user        User             @relation(fields: [userId], references: [id])
-  jobPlanId   String?
-  title       String
-  message     String           // Truncated preview
-  isRead      Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  
+  id        String           @id @default(cuid())
+  type      NotificationType
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  jobPlanId String?
+  title     String
+  message   String // Truncated preview
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
   @@index([userId, isRead])
   @@index([createdAt])
 }
@@ -565,24 +539,24 @@ model PermitType {
   id          String      @id @default(cuid())
   name        String      @unique
   description String?
-  isDefault   Boolean     @default(false)  // System defaults can't be deleted
+  isDefault   Boolean     @default(false) // System defaults can't be deleted
   isArchived  Boolean     @default(false)
   createdAt   DateTime    @default(now())
   permits     JobPermit[]
 }
 
 model JobPermit {
-  id            String           @id @default(cuid())
-  jobPlanId     String
-  jobPlan       JobPlan          @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
-  permitTypeId  String
-  permitType    PermitType       @relation(fields: [permitTypeId], references: [id])
-  isApproved    Boolean          @default(false)
-  notes         String?
-  documents     PermitDocument[]
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  
+  id           String           @id @default(cuid())
+  jobPlanId    String
+  jobPlan      JobPlan          @relation(fields: [jobPlanId], references: [id], onDelete: Cascade)
+  permitTypeId String
+  permitType   PermitType       @relation(fields: [permitTypeId], references: [id])
+  isApproved   Boolean          @default(false)
+  notes        String?
+  documents    PermitDocument[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
   @@unique([jobPlanId, permitTypeId])
   @@index([jobPlanId])
 }
@@ -593,11 +567,11 @@ model PermitDocument {
   jobPermit    JobPermit @relation(fields: [jobPermitId], references: [id], onDelete: Cascade)
   fileName     String
   fileUrl      String
-  fileType     String    // "application/pdf", "image/jpeg", etc.
-  fileSize     Int       // bytes
+  fileType     String // "application/pdf", "image/jpeg", etc.
+  fileSize     Int // bytes
   uploadedById String
   uploadedBy   User      @relation("DocumentUploader", fields: [uploadedById], references: [id])
   uploadedAt   DateTime  @default(now())
-  
+
   @@index([jobPermitId])
 }

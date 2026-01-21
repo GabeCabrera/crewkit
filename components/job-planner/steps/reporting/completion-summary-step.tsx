@@ -201,9 +201,9 @@ export function CompletionSummaryStep({ job }: CompletionSummaryStepProps) {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-slate-500">Route</p>
+            <p className="text-sm text-slate-500">Location</p>
             <p className="font-medium text-slate-700">
-              {job.startPoleId} → {job.endPoleId}
+              {job.locationName || `${job.totalDistance.toLocaleString()} ft`}
             </p>
           </div>
         </div>

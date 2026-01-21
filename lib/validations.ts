@@ -131,9 +131,11 @@ export type JobPlanStatus = z.infer<typeof jobPlanStatusSchema>;
 export const createJobPlanSchema = z.object({
   // Route Details (required)
   jobName: z.string().min(1, "Job name is required").max(200, "Job name too long"),
-  startPoleId: z.string().min(1, "Start pole ID is required").max(50, "Start pole ID too long"),
-  endPoleId: z.string().min(1, "End pole ID is required").max(50, "End pole ID too long"),
-  totalDistance: z.number().positive("Distance must be greater than 0"),
+  jobNumber: z.string().max(50, "Job number too long").optional().nullable(),
+  locationName: z.string().max(200, "Location name too long").optional().nullable(),
+  vetroProjectUrl: z.string().url("Invalid URL format").max(500, "URL too long").optional().nullable().or(z.literal("")),
+  totalDistance: z.number().min(0, "Distance must be 0 or greater").default(0),
+  poleCount: z.number().int().min(0, "Pole count must be 0 or greater").default(0),
   
   // Materials (optional with defaults)
   strandFootage: z.number().min(0).optional(),
@@ -189,9 +191,11 @@ export interface JobForStatusValidation {
   permits?: PermitForValidation[];
   // Route info
   jobName: string;
-  startPoleId: string;
-  endPoleId: string;
+  jobNumber?: string | null;
+  locationName?: string | null;
+  vetroProjectUrl?: string | null;
   totalDistance: number;
+  poleCount?: number;
   plannedStartDate: string | Date | null;
   assignments?: { id: string }[];
 }
@@ -218,10 +222,6 @@ export function hasRouteComplete(job: JobForStatusValidation): boolean {
   return (
     !!job.jobName &&
     job.jobName.trim() !== "" &&
-    !!job.startPoleId &&
-    job.startPoleId.trim() !== "" &&
-    !!job.endPoleId &&
-    job.endPoleId.trim() !== "" &&
     job.totalDistance > 0
   );
 }
@@ -359,9 +359,11 @@ export function getAvailableStatusOptions(job: JobForStatusValidation): {
 export const updateJobPlanSchema = z.object({
   // Route Details
   jobName: z.string().min(1).max(200).optional(),
-  startPoleId: z.string().min(1).max(50).optional(),
-  endPoleId: z.string().min(1).max(50).optional(),
+  jobNumber: z.string().max(50).optional().nullable(),
+  locationName: z.string().max(200).optional().nullable(),
+  vetroProjectUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
   totalDistance: z.number().min(0).optional(),
+  poleCount: z.number().int().min(0).optional(),
   
   // Materials
   strandFootage: z.number().min(0).optional(),

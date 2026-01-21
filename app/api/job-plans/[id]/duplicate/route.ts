@@ -58,9 +58,11 @@ export async function POST(
         easementsClear: false,
         // Planning - Route (copy with new name)
         jobName: `Copy of ${original.jobName}`,
-        startPoleId: original.startPoleId,
-        endPoleId: original.endPoleId,
+        jobNumber: original.jobNumber,
+        locationName: original.locationName,
+        vetroProjectUrl: original.vetroProjectUrl,
         totalDistance: original.totalDistance,
+        poleCount: original.poleCount,
         // Planning - Materials (copy planned values)
         strandFootage: original.strandFootage,
         fiberFootage: original.fiberFootage,

@@ -28,9 +28,10 @@ interface Assignment {
 interface JobPlan {
   id: string;
   jobName: string;
-  startPoleId: string;
-  endPoleId: string;
+  jobNumber: string | null;
+  locationName: string | null;
   totalDistance: number;
+  poleCount: number;
   actualFootage: number;
   status: JobPlanStatus;
   priority: JobPriority;
@@ -311,7 +312,7 @@ export function JobTimelineView({
                         {job.jobName}
                       </p>
                       <p className="text-xs text-slate-500 truncate">
-                        {job.startPoleId} → {job.endPoleId}
+                        {job.locationName || `${job.totalDistance.toLocaleString()} ft`}
                       </p>
                     </div>
                     {job.assignments.length > 0 && (

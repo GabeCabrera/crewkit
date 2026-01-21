@@ -65,9 +65,10 @@ interface Assignment {
 interface JobPlan {
   id: string;
   jobName: string;
-  startPoleId: string;
-  endPoleId: string;
+  jobNumber: string | null;
+  locationName: string | null;
   totalDistance: number;
+  poleCount: number;
   actualFootage: number;
   status: JobPlanStatus;
   priority: JobPriority;
@@ -274,8 +275,8 @@ export function JobKanbanBoard({
       const query = searchQuery.toLowerCase();
       if (
         !job.jobName.toLowerCase().includes(query) &&
-        !job.startPoleId.toLowerCase().includes(query) &&
-        !job.endPoleId.toLowerCase().includes(query)
+        !(job.jobNumber?.toLowerCase().includes(query)) &&
+        !(job.locationName?.toLowerCase().includes(query))
       ) {
         return false;
       }
@@ -993,13 +994,13 @@ function DesktopJobCard({
         <div className="flex items-center gap-1 text-xs text-slate-500 mb-1.5">
           <MapPin className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">
-            {job.startPoleId} → {job.endPoleId}
+            {job.locationName || `${job.totalDistance.toLocaleString()} ft`}
           </span>
         </div>
 
-        {/* Distance */}
+        {/* Distance & Poles */}
         <div className="text-xs text-slate-500 mb-2">
-          {job.totalDistance.toLocaleString()} ft
+          {job.totalDistance.toLocaleString()} ft{job.poleCount > 0 && ` • ${job.poleCount} poles`}
         </div>
 
         {/* Badges Row */}
@@ -1239,10 +1240,10 @@ function MobileJobCard({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 text-sm text-slate-600">
             <MapPin className="h-4 w-4" />
-            <span>{job.startPoleId} → {job.endPoleId}</span>
+            <span>{job.locationName || `${job.totalDistance.toLocaleString()} ft`}</span>
           </div>
           <span className="text-sm text-slate-500">
-            {job.totalDistance.toLocaleString()} ft
+            {job.poleCount > 0 ? `${job.poleCount} poles` : `${job.totalDistance.toLocaleString()} ft`}
           </span>
         </div>
 

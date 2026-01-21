@@ -168,20 +168,20 @@ export function AsBuiltStep({ job }: AsBuiltStepProps) {
         <h4 className="text-sm font-medium text-slate-700 mb-3">Route Information</h4>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-slate-500">Start Pole</p>
-            <p className="font-medium text-slate-900">{job.startPoleId}</p>
+            <p className="text-slate-500">Job Name</p>
+            <p className="font-medium text-slate-900">{job.jobName}</p>
           </div>
           <div>
-            <p className="text-slate-500">End Pole</p>
-            <p className="font-medium text-slate-900">{job.endPoleId}</p>
+            <p className="text-slate-500">Location</p>
+            <p className="font-medium text-slate-900">{job.locationName || "—"}</p>
           </div>
           <div>
             <p className="text-slate-500">Poles Completed</p>
             <p className="font-medium text-slate-900">{job.actualPolesComplete}</p>
           </div>
           <div>
-            <p className="text-slate-500">Job Name</p>
-            <p className="font-medium text-slate-900">{job.jobName}</p>
+            <p className="text-slate-500">Planned Poles</p>
+            <p className="font-medium text-slate-900">{job.poleCount || "—"}</p>
           </div>
         </div>
       </div>

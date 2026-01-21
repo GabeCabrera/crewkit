@@ -86,9 +86,11 @@ interface JobPermit {
 interface JobPlanDetail {
   id: string;
   jobName: string;
-  startPoleId: string;
-  endPoleId: string;
+  jobNumber: string | null;
+  locationName: string | null;
+  vetroProjectUrl: string | null;
   totalDistance: number;
+  poleCount: number;
   strandFootage: number;
   fiberFootage: number;
   deadEnds: number;
@@ -157,9 +159,11 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       // Include dynamic permits for validation
       permits: job.permits?.map(p => ({ id: p.id, isApproved: p.isApproved })),
       jobName: job.jobName,
-      startPoleId: job.startPoleId,
-      endPoleId: job.endPoleId,
+      jobNumber: job.jobNumber,
+      locationName: job.locationName,
+      vetroProjectUrl: job.vetroProjectUrl,
       totalDistance: job.totalDistance,
+      poleCount: job.poleCount,
       plannedStartDate: job.plannedStartDate,
       assignments: job.assignments,
     });
@@ -377,16 +381,16 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
             </div>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-xs text-slate-500">Start Pole</p>
-                <p className="font-medium">{job.startPoleId}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">End Pole</p>
-                <p className="font-medium">{job.endPoleId}</p>
+                <p className="text-xs text-slate-500">Location</p>
+                <p className="font-medium">{job.locationName || "—"}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-500">Distance</p>
                 <p className="font-medium">{job.totalDistance.toLocaleString()} ft</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Poles</p>
+                <p className="font-medium">{job.poleCount || "—"}</p>
               </div>
             </div>
           </div>

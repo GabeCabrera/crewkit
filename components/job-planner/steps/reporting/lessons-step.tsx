@@ -76,9 +76,9 @@ export function LessonsStep({ job, updateJob, canEdit }: LessonsStepProps) {
             <p className="font-medium text-slate-900">{job.jobName}</p>
           </div>
           <div>
-            <p className="text-slate-500">Route</p>
+            <p className="text-slate-500">Location</p>
             <p className="font-medium text-slate-900">
-              {job.startPoleId} → {job.endPoleId}
+              {job.locationName || "—"}
             </p>
           </div>
           <div>

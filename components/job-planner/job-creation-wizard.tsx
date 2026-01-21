@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Briefcase, MapPin, FileText } from "lucide-react";
+import { Loader2, Briefcase, MapPin, FileText, ExternalLink, Hash } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 interface JobCreationWizardProps {
   open: boolean;
@@ -32,18 +31,20 @@ export function JobCreationWizard({
 
   // Form state
   const [jobName, setJobName] = useState("");
-  const [description, setDescription] = useState("");
-  const [startPoleId, setStartPoleId] = useState("");
-  const [endPoleId, setEndPoleId] = useState("");
+  const [jobNumber, setJobNumber] = useState("");
+  const [locationName, setLocationName] = useState("");
+  const [vetroProjectUrl, setVetroProjectUrl] = useState("");
   const [totalDistance, setTotalDistance] = useState("");
+  const [poleCount, setPoleCount] = useState("");
 
   const resetForm = () => {
     setStep(1);
     setJobName("");
-    setDescription("");
-    setStartPoleId("");
-    setEndPoleId("");
+    setJobNumber("");
+    setLocationName("");
+    setVetroProjectUrl("");
     setTotalDistance("");
+    setPoleCount("");
     setError(null);
   };
 
@@ -67,10 +68,11 @@ export function JobCreationWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jobName: jobName.trim(),
-          description: description.trim() || undefined,
-          startPoleId: startPoleId.trim() || "",
-          endPoleId: endPoleId.trim() || "",
+          jobNumber: jobNumber.trim() || null,
+          locationName: locationName.trim() || null,
+          vetroProjectUrl: vetroProjectUrl.trim() || null,
           totalDistance: totalDistance ? parseFloat(totalDistance) : 0,
+          poleCount: poleCount ? parseInt(poleCount) : 0,
         }),
       });
 
@@ -131,7 +133,7 @@ export function JobCreationWizard({
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-4">
                 <FileText className="h-4 w-4" />
-                Basic Information
+                Job Identification
               </div>
 
               <div className="space-y-2">
@@ -145,15 +147,32 @@ export function JobCreationWizard({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional description of the job..."
-                  rows={3}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="jobNumber" className="flex items-center gap-1.5">
+                    <Hash className="h-3.5 w-3.5 text-slate-400" />
+                    Job Number
+                  </Label>
+                  <Input
+                    id="jobNumber"
+                    value={jobNumber}
+                    onChange={(e) => setJobNumber(e.target.value)}
+                    placeholder="e.g., JOB-2024-001"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="locationName" className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                    Location / Area
+                  </Label>
+                  <Input
+                    id="locationName"
+                    value={locationName}
+                    onChange={(e) => setLocationName(e.target.value)}
+                    placeholder="e.g., Oak Hills Phase 2"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -166,38 +185,47 @@ export function JobCreationWizard({
                 Route Details (Optional)
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startPoleId">Start Pole ID</Label>
-                  <Input
-                    id="startPoleId"
-                    value={startPoleId}
-                    onChange={(e) => setStartPoleId(e.target.value)}
-                    placeholder="e.g., P001"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="endPoleId">End Pole ID</Label>
-                  <Input
-                    id="endPoleId"
-                    value={endPoleId}
-                    onChange={(e) => setEndPoleId(e.target.value)}
-                    placeholder="e.g., P050"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="vetroProjectUrl" className="flex items-center gap-1.5">
+                  <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                  Vetro Project URL
+                </Label>
+                <Input
+                  id="vetroProjectUrl"
+                  type="url"
+                  value={vetroProjectUrl}
+                  onChange={(e) => setVetroProjectUrl(e.target.value)}
+                  placeholder="https://fibermap.vetro.io/..."
+                />
+                <p className="text-xs text-slate-500">
+                  Link to the route in Vetro FiberMap
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="totalDistance">Estimated Distance (ft)</Label>
-                <Input
-                  id="totalDistance"
-                  type="number"
-                  value={totalDistance}
-                  onChange={(e) => setTotalDistance(e.target.value)}
-                  placeholder="e.g., 5000"
-                  min="0"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="totalDistance">Total Footage</Label>
+                  <Input
+                    id="totalDistance"
+                    type="number"
+                    value={totalDistance}
+                    onChange={(e) => setTotalDistance(e.target.value)}
+                    placeholder="e.g., 5000"
+                    min="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="poleCount">Pole Count</Label>
+                  <Input
+                    id="poleCount"
+                    type="number"
+                    value={poleCount}
+                    onChange={(e) => setPoleCount(e.target.value)}
+                    placeholder="e.g., 25"
+                    min="0"
+                  />
+                </div>
               </div>
             </div>
           )}
