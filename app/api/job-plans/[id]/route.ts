@@ -105,6 +105,52 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         },
+        requiredAssemblies: {
+          include: {
+            assembly: {
+              include: {
+                type: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+                items: {
+                  include: {
+                    equipment: {
+                      select: {
+                        id: true,
+                        name: true,
+                        sku: true,
+                        pricePerUnit: true,
+                        unitType: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        redLightDocuments: {
+          include: {
+            uploadedBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { uploadedAt: "desc" },
+        },
       },
     });
 

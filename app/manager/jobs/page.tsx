@@ -47,24 +47,22 @@ function JobsPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white -m-4 sm:-m-6 lg:-m-8">
+    <div className="py-6 sm:py-8">
       {/* Header */}
-      <div className="bg-white border-b border-slate-100">
-        <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
-              <Briefcase className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Jobs</h1>
-              <p className="text-slate-500 text-sm sm:text-base">Manage and track job plans</p>
-            </div>
+      <div className="px-4 sm:px-6 lg:px-8 mb-6 sm:mb-8">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
+            <Briefcase className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Jobs</h1>
+            <p className="text-slate-500 text-sm sm:text-base">Manage and track job plans</p>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-7xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8">
         <JobKanbanBoard
           key={refreshKey}
           onCreateNew={handleCreateNew}

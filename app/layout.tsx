@@ -18,10 +18,19 @@ export const metadata: Metadata = {
   title: "CrewKit - Assembly & Inventory Tracker",
   description: "Assembly and inventory tracking tool for field operations",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/icon-192x192.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "CrewKit",
+  },
+  other: {
+    // Modern PWA meta tag (replaces deprecated apple-mobile-web-app-capable)
+    "mobile-web-app-capable": "yes",
   },
 };
 

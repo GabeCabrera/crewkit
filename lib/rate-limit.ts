@@ -149,3 +149,11 @@ export function writeRateLimit(request: NextRequest): NextResponse | null {
   return rateLimit(request, { limit: 30, windowSeconds: 60 });
 }
 
+/**
+ * Rate limit for read operations (GET)
+ * More lenient than write operations
+ */
+export function readRateLimit(request: NextRequest): NextResponse | null {
+  return rateLimit(request, { limit: 100, windowSeconds: 60 });
+}
+

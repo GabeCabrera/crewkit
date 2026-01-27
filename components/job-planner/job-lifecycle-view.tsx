@@ -14,15 +14,16 @@ import {
   X,
   Pencil,
   Check,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 // Planning Steps
 import { PermitsStep } from "./steps/planning/permits-step";
-import { RouteStep } from "./steps/planning/route-step";
+import { RouteDesignStep } from "./steps/planning/route-design-step";
 import { MaterialsStep } from "./steps/planning/materials-step";
-import { HazardsStep } from "./steps/planning/hazards-step";
 import { CrewStep } from "./steps/planning/crew-step";
 import { SchedulingStep } from "./steps/planning/scheduling-step";
 
@@ -62,6 +63,52 @@ interface JobPermit {
   documents: PermitDocument[];
 }
 
+// Type for red light check documents
+export interface RedLightDocument {
+  id: string;
+  checkType: string; // "dot_permit" | "row_confirmed" | "power_lines" | "traffic_control"
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  uploadedAt: string;
+  uploadedBy: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+}
+
+// Type for assembly equipment items
+interface AssemblyEquipmentItem {
+  id: string;
+  quantity: number;
+  equipment: {
+    id: string;
+    name: string;
+    sku: string;
+    pricePerUnit?: number;
+    unitType?: string;
+  };
+}
+
+// Type for job plan assemblies
+export interface JobPlanAssemblyData {
+  id: string;
+  assemblyId: string | null;  // Optional - may not have matching Assembly record
+  quantity: number;
+  assemblyType: string;
+  isAutoDetected: boolean;
+  assembly: {  // Optional - null if no matching Assembly template exists
+    id: string;
+    name: string;
+    description: string | null;
+    type: { id: string; name: string } | null;
+    category: { id: string; name: string } | null;
+    items: AssemblyEquipmentItem[];
+  } | null;
+}
+
 export interface JobPlanData {
   id: string;
   // Planning - Permits (legacy fields for backwards compatibility)
@@ -92,6 +139,9 @@ export interface JobPlanData {
   redLightClearedAt?: string | null;
   redLightClearedById?: string | null;
   
+  // Red Light Check Documents
+  redLightDocuments?: RedLightDocument[];
+  
   // Planning - Route
   jobName: string;
   jobNumber: string | null;
@@ -112,8 +162,9 @@ export interface JobPlanData {
   vetroProjectUrl: string | null;
   
   // Build Spec
-  primaryMethod: string | null;     // "aerial" | "underground" | "both"
-  constructionType: string | null;  // "new_strand" | "overlash" | "adss" | "ug_dip"
+  jobBuildType: "full_build" | "strand_build" | "fiber_build" | "peripheral_build";  // Default: full_build
+  primaryMethod: string | null;     // DEPRECATED: "aerial" | "underground" | "both"
+  constructionType: string | null;  // DEPRECATED: "new_strand" | "overlash" | "adss" | "ug_dip"
   cableProfile: string | null;      // e.g., "144ct Loose Tube"
   sagTensionSpec: string | null;    // e.g., "NESC Heavy"
   
@@ -158,6 +209,8 @@ export interface JobPlanData {
   plannedEndDate: string | null;
   estimatedDuration: number | null;
   durationUnit: string | null;
+  overtimeApproved: boolean;
+  customWorkDays: string | null; // JSON array of day numbers for per-job override
   // Construction - Actuals
   actualFootage: number;
   actualPolesComplete: number;
@@ -181,6 +234,8 @@ export interface JobPlanData {
     userId: string;
     user: { id: string; name: string | null; email: string };
   }>;
+  // Required assemblies (from map detection or manual entry)
+  requiredAssemblies?: JobPlanAssemblyData[];
 }
 
 interface JobLifecycleViewProps {
@@ -195,9 +250,10 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [currentStep, setCurrentStep] = useState("route");
+  const [currentStep, setCurrentStep] = useState("route-design");
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -233,6 +289,9 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
   // Cleanup: flush pending saves on unmount
   useEffect(() => {
+    // Store jobId in a ref-accessible variable for cleanup
+    const currentJobId = jobId;
+    
     return () => {
       // Clear any pending debounce timer
       if (saveTimeoutRef.current) {
@@ -244,13 +303,20 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
         abortControllerRef.current.abort();
       }
       
-      // Flush any pending updates before unmount (fire-and-forget)
-      if (Object.keys(pendingUpdatesRef.current).length > 0) {
-        fetch(`/api/job-plans/${jobId}`, {
+      // Flush any pending updates before unmount using navigator.sendBeacon
+      // This is more reliable than fetch with keepalive for page unload scenarios
+      // and won't trigger "message channel closed" errors
+      const pendingData = pendingUpdatesRef.current;
+      if (Object.keys(pendingData).length > 0) {
+        const blob = new Blob([JSON.stringify(pendingData)], { type: "application/json" });
+        
+        // navigator.sendBeacon is designed for this use case
+        // Note: sendBeacon always sends POST, so our API needs to handle this
+        // For now, keep using fetch with keepalive which works for PATCH
+        fetch(`/api/job-plans/${currentJobId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(pendingUpdatesRef.current),
-          // Use keepalive to ensure request completes even after page unload
+          body: JSON.stringify(pendingData),
           keepalive: true,
         }).catch(() => {
           // Silently fail on unmount - nothing we can do
@@ -283,17 +349,12 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
       completed.add("permits");
     }
 
-    // Route - required fields filled
+    // Route Design - required fields filled (combined route + materials)
     if (
       jobData.jobName &&
-      jobData.totalDistance > 0
+      (jobData.totalDistance > 0 || jobData.aerialFootage > 0 || jobData.undergroundFootage > 0)
     ) {
-      completed.add("route");
-    }
-
-    // Materials - strand and fiber > 0
-    if (jobData.strandFootage > 0 && jobData.fiberFootage > 0) {
-      completed.add("materials");
+      completed.add("route-design");
     }
 
     // Hazards - always considered "complete" (all optional)
@@ -482,23 +543,25 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
   const renderStepContent = () => {
     if (!job) return null;
 
+    const isAdmin =
+      session?.user?.role === "ADMIN" || session?.user?.role === "SUPERUSER";
+    
     const stepProps = {
       job,
       updateJob,
       refreshJob,
       canEdit,
+      isAdmin,
     };
 
     switch (currentStep) {
       // Planning
+      case "route-design":
+        return <RouteDesignStep {...stepProps} />;
+      case "bom":
+        return <MaterialsStep {...stepProps} />;
       case "permits":
         return <PermitsStep {...stepProps} onNavigate={handleStepChange} />;
-      case "route":
-        return <RouteStep {...stepProps} onNavigate={handleStepChange} />;
-      case "materials":
-        return <MaterialsStep {...stepProps} />;
-      case "hazards":
-        return <HazardsStep {...stepProps} />;
       case "crew":
         return <CrewStep {...stepProps} />;
       case "scheduling":
@@ -530,7 +593,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center bg-slate-50">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
       </div>
     );
@@ -538,7 +601,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
 
   if (!job) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="h-screen flex flex-col items-center justify-center gap-4 bg-slate-50">
         <p className="text-slate-500">Job not found</p>
         <Button onClick={() => router.push(backUrl)}>Go Back</Button>
       </div>
@@ -548,20 +611,26 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
   const currentStepInfo = steps.find((s) => s.id === currentStep);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="h-screen overflow-hidden flex flex-col bg-slate-50">
       {/* Header - offset on desktop to not overlap job phase sidebar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 lg:ml-72">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
+      <header className={cn(
+        "bg-white border-b border-slate-200 shrink-0 z-30 transition-all duration-200",
+        sidebarCollapsed ? "lg:ml-14" : "lg:ml-72"
+      )}>
+        <div className="flex items-center justify-between px-4 py-3 sm:py-4">
+          {/* Left Section: Back + Job Info */}
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => router.push(backUrl)}
-              className="shrink-0"
+              className="shrink-0 -ml-2"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="min-w-0">
+            
+            <div className="min-w-0 flex-1">
+              {/* Job Name - Editable */}
               {isEditingName ? (
                 <div className="flex items-center gap-2">
                   <Input
@@ -570,7 +639,7 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
                     onChange={(e) => setEditedName(e.target.value)}
                     onKeyDown={handleNameKeyDown}
                     onBlur={saveNameEdit}
-                    className="h-8 text-base font-semibold"
+                    className="h-9 text-lg font-semibold max-w-xs"
                     autoFocus
                   />
                   <Button
@@ -586,11 +655,11 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
                 <div
                   className={cn(
                     "group flex items-center gap-2",
-                    canEdit && "cursor-pointer"
+                    canEdit && "cursor-pointer hover:opacity-80 transition-opacity"
                   )}
                   onClick={canEdit ? startEditingName : undefined}
                 >
-                  <h1 className="font-semibold text-slate-900 truncate">
+                  <h1 className="text-lg sm:text-xl font-semibold text-slate-900 truncate">
                     {job.jobName}
                   </h1>
                   {canEdit && (
@@ -598,26 +667,68 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
                   )}
                 </div>
               )}
-              <p className="text-xs text-slate-500">
-                {job.locationName || job.jobNumber || `${job.totalDistance.toLocaleString()} ft`}
-              </p>
+              
+              {/* Meta Info Row - Job Number & Phase */}
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {/* Job Number Badge */}
+                {job.jobNumber && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-600 font-mono tracking-tight">
+                    {job.jobNumber}
+                  </span>
+                )}
+                
+                {/* Phase Indicator */}
+                {currentStepInfo && (
+                  <>
+                    <span className="text-slate-300 hidden sm:inline">•</span>
+                    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+                      <span 
+                        className={cn(
+                          "w-1.5 h-1.5 rounded-full",
+                          currentStepInfo.phase === "planning" && "bg-blue-500",
+                          currentStepInfo.phase === "construction" && "bg-amber-500",
+                          currentStepInfo.phase === "reporting" && "bg-emerald-500"
+                        )}
+                      />
+                      <span className="capitalize">{currentStepInfo.phase}</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-slate-600 font-medium">{currentStepInfo.name}</span>
+                    </span>
+                  </>
+                )}
+                
+                {/* Save Status - Inline on mobile */}
+                <span className="sm:hidden text-xs">
+                  {saveStatus === "saving" && (
+                    <span className="inline-flex items-center gap-1 text-slate-400">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    </span>
+                  )}
+                  {saveStatus === "saved" && (
+                    <span className="inline-flex items-center gap-1 text-emerald-500">
+                      <CheckCircle2 className="h-3 w-3" />
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Save Status */}
-            <div className="hidden sm:flex items-center gap-1.5 text-sm text-slate-500">
+          {/* Right Section: Status + Menu */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Save Status - Desktop */}
+            <div className="hidden sm:flex items-center gap-1.5 text-sm">
               {saveStatus === "saving" && (
-                <>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 text-slate-500">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>Saving...</span>
-                </>
+                  <span>Saving</span>
+                </span>
               )}
               {saveStatus === "saved" && (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                  <span className="text-emerald-600">Saved</span>
-                </>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Saved</span>
+                </span>
               )}
             </div>
 
@@ -638,15 +749,33 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
         </div>
       </header>
 
-      <div className="flex">
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:block w-72 bg-white border-r border-slate-200 fixed left-[var(--sidebar-width,16rem)] top-[calc(4rem+1px)] bottom-0 overflow-y-auto z-20">
-          <JobPhaseSidebar
-            currentStep={currentStep}
-            onStepChange={handleStepChange}
-            completedSteps={completedSteps}
-            redLightCleared={calculateRedLightCleared(job)}
-          />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Desktop Sidebar - Collapsible, starts at left edge (no main sidebar in full-bleed mode) */}
+        <aside className={cn(
+          "hidden lg:flex flex-col bg-white border-r border-slate-200 fixed left-0 top-0 bottom-0 z-40 transition-all duration-200",
+          sidebarCollapsed ? "w-14" : "w-72"
+        )}>
+          {/* Collapse Toggle */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="absolute -right-3 top-4 z-50 h-6 w-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center hover:bg-slate-50 transition-colors"
+          >
+            {sidebarCollapsed ? (
+              <PanelLeft className="h-3.5 w-3.5 text-slate-600" />
+            ) : (
+              <PanelLeftClose className="h-3.5 w-3.5 text-slate-600" />
+            )}
+          </button>
+          
+          <div className={cn("flex-1 overflow-y-auto", sidebarCollapsed && "overflow-hidden")}>
+            <JobPhaseSidebar
+              currentStep={currentStep}
+              onStepChange={handleStepChange}
+              completedSteps={completedSteps}
+              redLightCleared={calculateRedLightCleared(job)}
+              collapsed={sidebarCollapsed}
+            />
+          </div>
         </aside>
 
         {/* Mobile Sidebar Overlay */}
@@ -670,33 +799,52 @@ export function JobLifecycleView({ jobId, backUrl }: JobLifecycleViewProps) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 lg:ml-72 min-h-[calc(100vh-4rem)]">
-          <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-            {/* Step Header */}
-            <div className="mb-6">
-              {currentStepInfo && (
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center">
-                    <currentStepInfo.icon className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      {currentStepInfo.name}
-                    </h2>
-                    <p className="text-sm text-slate-500 capitalize">
-                      {currentStepInfo.phase} Phase
-                    </p>
+        {(() => {
+          // Steps that need full-bleed rendering (no max-width, no card wrapper)
+          const FULL_BLEED_STEPS = new Set(["route-design"]);
+          const isFullBleed = FULL_BLEED_STEPS.has(currentStep);
+
+          return (
+            <main className={cn(
+              "flex-1 min-h-0 overflow-hidden transition-all duration-200",
+              sidebarCollapsed ? "lg:ml-14" : "lg:ml-72"
+            )}>
+              {isFullBleed ? (
+                // Full-bleed: no wrapper, no card, no padding - content fills space
+                renderStepContent()
+              ) : (
+                // Standard: constrained width with card, scrollable
+                <div className="h-full overflow-y-auto">
+                  <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+                    {/* Step Header */}
+                    <div className="mb-6">
+                      {currentStepInfo && (
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-xl bg-orange-50 flex items-center justify-center">
+                            <currentStepInfo.icon className="h-5 w-5 text-orange-600" />
+                          </div>
+                          <div>
+                            <h2 className="text-xl font-semibold text-slate-900">
+                              {currentStepInfo.name}
+                            </h2>
+                            <p className="text-sm text-slate-500 capitalize">
+                              {currentStepInfo.phase} Phase
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step Content */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                      {renderStepContent()}
+                    </div>
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Step Content */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              {renderStepContent()}
-            </div>
-          </div>
-        </main>
+            </main>
+          );
+        })()}
       </div>
     </div>
   );

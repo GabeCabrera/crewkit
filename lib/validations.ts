@@ -401,8 +401,9 @@ export const updateJobPlanSchema = z.object({
   vetroProjectUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
   
   // Build Spec
-  primaryMethod: z.enum(["aerial", "underground", "both"]).optional().nullable(),
-  constructionType: z.enum(["new_strand", "overlash", "adss", "ug_dip"]).optional().nullable(),
+  jobBuildType: z.enum(["full_build", "strand_build", "fiber_build", "peripheral_build"]).default("full_build"),
+  primaryMethod: z.enum(["aerial", "underground", "both"]).optional().nullable(), // DEPRECATED
+  constructionType: z.enum(["new_strand", "overlash", "adss", "ug_dip"]).optional().nullable(), // DEPRECATED
   cableProfile: z.string().max(100).optional().nullable(),
   sagTensionSpec: z.string().max(200).optional().nullable(),
   

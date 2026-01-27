@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -28,7 +28,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { JobViewSwitcher, ViewMode } from "./job-view-switcher";
-import { JobTimelineView } from "./job-timeline-view";
+import { JobCalendarView } from "./job-calendar-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -224,11 +224,11 @@ export function JobKanbanBoard({
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("jobBoardViewMode");
-      if (saved === "kanban" || saved === "timeline" || saved === "list") {
-        return saved;
-      }
+      // Map old values to new ones
+      if (saved === "list") return "list";
+      if (saved === "timeline" || saved === "calendar") return "calendar";
     }
-    return "kanban";
+    return "list"; // Default to list view
   });
 
   // Persist view mode changes
@@ -607,44 +607,18 @@ export function JobKanbanBoard({
       )}
 
       {/* Conditional View Based on Mode */}
-      {viewMode === "timeline" ? (
-        <JobTimelineView
+      {viewMode === "calendar" ? (
+        <JobCalendarView
           jobs={filteredJobs}
           onSelectJob={onSelectJob}
           selectedJobId={selectedJobId}
-        />
-      ) : viewMode === "list" || isMobile ? (
-        <MobileListView
-          jobs={filteredJobs}
-          columns={columns}
-          onSelectJob={onSelectJob}
-          onStatusChange={updateJobStatus}
-          selectedJobId={selectedJobId}
-          canEdit={canEdit}
-          hasHazards={hasHazards}
         />
       ) : (
-        <DesktopKanbanView
-          columns={columns}
-          getJobsByStatus={getJobsByStatus}
+        <CompactListView
+          jobs={filteredJobs}
           onSelectJob={onSelectJob}
-          onUpdateName={updateJobName}
-          onDuplicate={duplicateJob}
-          onDelete={(job) => {
-            setJobToDelete(job);
-            setDeleteDialogOpen(true);
-          }}
           selectedJobId={selectedJobId}
-          canEdit={canEdit}
-          canDelete={canDelete}
           hasHazards={hasHazards}
-          draggedJob={draggedJob}
-          dragOverColumn={dragOverColumn}
-          handleDragStart={handleDragStart}
-          handleDragOver={handleDragOver}
-          handleDragLeave={handleDragLeave}
-          handleDrop={handleDrop}
-          handleDragEnd={handleDragEnd}
         />
       )}
 
@@ -1342,5 +1316,259 @@ function MobileJobCard({
         </div>
       )}
     </div>
+  );
+}
+
+// ============================================
+// Compact List View Component
+// ============================================
+const statusConfig: Record<JobPlanStatus, { bg: string; text: string; label: string }> = {
+  DRAFT: { bg: "bg-slate-100", text: "text-slate-600", label: "Draft" },
+  READY: { bg: "bg-emerald-100", text: "text-emerald-700", label: "Ready" },
+  IN_PROGRESS: { bg: "bg-blue-100", text: "text-blue-700", label: "Active" },
+  COMPLETED: { bg: "bg-green-100", text: "text-green-700", label: "Done" },
+  CANCELLED: { bg: "bg-red-100", text: "text-red-600", label: "Cancelled" },
+};
+
+const priorityDot: Record<JobPriority, string> = {
+  URGENT: "bg-red-500",
+  HIGH: "bg-orange-500",
+  MEDIUM: "bg-blue-400",
+  LOW: "bg-slate-300",
+};
+
+interface CompactListViewProps {
+  jobs: JobPlan[];
+  onSelectJob?: (job: JobPlan) => void;
+  selectedJobId?: string | null;
+  hasHazards: (job: JobPlan) => boolean;
+}
+
+function CompactListView({
+  jobs,
+  onSelectJob,
+  selectedJobId,
+  hasHazards,
+}: CompactListViewProps) {
+  // Sort jobs: scheduled first (by date), then unscheduled
+  const sortedJobs = useMemo(() => {
+    const scheduled = jobs
+      .filter((job) => job.plannedStartDate)
+      .sort((a, b) => {
+        const dateA = new Date(a.plannedStartDate!).getTime();
+        const dateB = new Date(b.plannedStartDate!).getTime();
+        return dateA - dateB;
+      });
+    
+    const unscheduled = jobs.filter((job) => !job.plannedStartDate);
+    
+    return { scheduled, unscheduled };
+  }, [jobs]);
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Check if today
+    if (date.toDateString() === today.toDateString()) {
+      return "Today";
+    }
+    // Check if tomorrow
+    if (date.toDateString() === tomorrow.toDateString()) {
+      return "Tomorrow";
+    }
+    // Otherwise show short date
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const isOverdue = (dateStr: string | null, status: JobPlanStatus) => {
+    if (!dateStr || status === "COMPLETED" || status === "CANCELLED") return false;
+    return new Date(dateStr) < new Date();
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      {/* Header Row */}
+      <div className="hidden sm:flex items-center gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-500 uppercase tracking-wide">
+        <div className="w-1.5" /> {/* Priority spacer */}
+        <div className="w-20">Status</div>
+        <div className="flex-1">Job</div>
+        <div className="w-24 text-right">Date</div>
+        <div className="w-20 text-center">Crew</div>
+        <div className="w-5" /> {/* Hazard spacer */}
+      </div>
+
+      {/* Scheduled Jobs */}
+      {sortedJobs.scheduled.length > 0 && (
+        <div>
+          {sortedJobs.scheduled.map((job) => (
+            <CompactJobRow
+              key={job.id}
+              job={job}
+              onSelect={() => onSelectJob?.(job)}
+              isSelected={selectedJobId === job.id}
+              hasHazards={hasHazards(job)}
+              formattedDate={formatDate(job.plannedStartDate)}
+              isOverdue={isOverdue(job.plannedEndDate, job.status)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Unscheduled Section */}
+      {sortedJobs.unscheduled.length > 0 && (
+        <div>
+          <div className="px-4 py-2 bg-slate-100 border-y border-slate-200 text-xs font-medium text-slate-500 uppercase tracking-wide">
+            Unscheduled ({sortedJobs.unscheduled.length})
+          </div>
+          {sortedJobs.unscheduled.map((job) => (
+            <CompactJobRow
+              key={job.id}
+              job={job}
+              onSelect={() => onSelectJob?.(job)}
+              isSelected={selectedJobId === job.id}
+              hasHazards={hasHazards(job)}
+              formattedDate={null}
+              isOverdue={false}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {jobs.length === 0 && (
+        <div className="py-12 text-center text-slate-400">
+          <p className="text-sm">No jobs found</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Compact Job Row Component
+// ============================================
+interface CompactJobRowProps {
+  job: JobPlan;
+  onSelect: () => void;
+  isSelected: boolean;
+  hasHazards: boolean;
+  formattedDate: string | null;
+  isOverdue: boolean;
+}
+
+function CompactJobRow({
+  job,
+  onSelect,
+  isSelected,
+  hasHazards,
+  formattedDate,
+  isOverdue,
+}: CompactJobRowProps) {
+  const status = statusConfig[job.status];
+  const priorityColor = priorityDot[job.priority];
+
+  return (
+    <button
+      onClick={onSelect}
+      className={cn(
+        "w-full flex items-center gap-3 px-4 py-3 border-b border-slate-100 text-left transition-colors",
+        "hover:bg-slate-50 focus:outline-none focus:bg-slate-50",
+        isSelected && "bg-orange-50 hover:bg-orange-50"
+      )}
+    >
+      {/* Priority Indicator */}
+      <div className={cn("w-1.5 h-8 rounded-full flex-shrink-0", priorityColor)} />
+
+      {/* Status Badge */}
+      <span
+        className={cn(
+          "hidden sm:inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 w-16 justify-center",
+          status.bg,
+          status.text
+        )}
+      >
+        {status.label}
+      </span>
+
+      {/* Mobile Status Dot */}
+      <span
+        className={cn(
+          "sm:hidden w-2 h-2 rounded-full flex-shrink-0",
+          status.bg.replace("100", "500")
+        )}
+      />
+
+      {/* Job Info */}
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-slate-900 truncate">{job.jobName}</p>
+        <p className="text-xs text-slate-500 truncate">
+          {job.locationName || `${job.totalDistance.toLocaleString()} ft`}
+          {job.poleCount > 0 && ` · ${job.poleCount} poles`}
+        </p>
+      </div>
+
+      {/* Date */}
+      <div className="hidden sm:block w-24 text-right flex-shrink-0">
+        {formattedDate ? (
+          <span
+            className={cn(
+              "text-sm",
+              isOverdue ? "text-red-600 font-medium" : "text-slate-600"
+            )}
+          >
+            {formattedDate}
+          </span>
+        ) : (
+          <span className="text-sm text-slate-300">—</span>
+        )}
+      </div>
+
+      {/* Mobile Date */}
+      {formattedDate && (
+        <span
+          className={cn(
+            "sm:hidden text-xs flex-shrink-0",
+            isOverdue ? "text-red-600" : "text-slate-500"
+          )}
+        >
+          {formattedDate}
+        </span>
+      )}
+
+      {/* Crew Avatars */}
+      <div className="hidden sm:flex w-20 justify-center flex-shrink-0">
+        {job.assignments.length > 0 ? (
+          <div className="flex -space-x-1.5">
+            {job.assignments.slice(0, 3).map((assignment) => (
+              <div
+                key={assignment.id}
+                className="h-6 w-6 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-medium text-slate-600"
+                title={assignment.user.name || assignment.user.email}
+              >
+                {(assignment.user.name || assignment.user.email)[0].toUpperCase()}
+              </div>
+            ))}
+            {job.assignments.length > 3 && (
+              <div className="h-6 w-6 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-medium text-slate-600">
+                +{job.assignments.length - 3}
+              </div>
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-slate-300">—</span>
+        )}
+      </div>
+
+      {/* Hazard Icon */}
+      <div className="w-5 flex-shrink-0">
+        {hasHazards && (
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+        )}
+      </div>
+    </button>
   );
 }

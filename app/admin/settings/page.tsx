@@ -20,7 +20,9 @@ import {
   Loader2,
   X,
   Check,
+  Calendar,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ProjectArea {
   id: string;
@@ -50,6 +52,13 @@ export default function AdminSettingsPage() {
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companySuccess, setCompanySuccess] = useState<string | null>(null);
   const [companyError, setCompanyError] = useState<string | null>(null);
+
+  // Work Schedule settings (ADMIN/SUPERUSER)
+  const [workDays, setWorkDays] = useState<number[]>([1, 2, 3, 4]); // Default Mon-Thu
+  const [shiftHours, setShiftHours] = useState<number>(12);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleSuccess, setScheduleSuccess] = useState<string | null>(null);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   // Project Areas settings (ADMIN/SUPERUSER)
   const [projectAreas, setProjectAreas] = useState<ProjectArea[]>([]);
@@ -87,19 +96,30 @@ export default function AdminSettingsPage() {
   }, [isAdmin]);
 
   useEffect(() => {
-    if (isSuperuser) {
+    // Fetch system settings (company name for superuser, work schedule for admin+)
+    if (isAdmin) {
       fetch("/api/settings")
         .then((res) => res.json())
         .then((data) => {
           if (data.companyName) {
             setCompanyName(data.companyName);
           }
+          if (data.workDays) {
+            try {
+              setWorkDays(JSON.parse(data.workDays));
+            } catch {
+              setWorkDays([1, 2, 3, 4]);
+            }
+          }
+          if (data.shiftHours) {
+            setShiftHours(data.shiftHours);
+          }
         })
         .catch(console.error);
     }
     
     fetchProjectAreas();
-  }, [isSuperuser, fetchProjectAreas]);
+  }, [isAdmin, fetchProjectAreas]);
 
   const handleSaveCompanyName = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,6 +152,64 @@ export default function AdminSettingsPage() {
       setCompanyLoading(false);
     }
   };
+
+  const handleSaveWorkSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setScheduleSuccess(null);
+    setScheduleError(null);
+
+    if (workDays.length === 0) {
+      setScheduleError("At least one work day must be selected");
+      return;
+    }
+
+    if (shiftHours < 1 || shiftHours > 24) {
+      setScheduleError("Shift hours must be between 1 and 24");
+      return;
+    }
+
+    setScheduleLoading(true);
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          workDays: JSON.stringify(workDays.sort((a, b) => a - b)),
+          shiftHours 
+        }),
+      });
+
+      if (response.ok) {
+        setScheduleSuccess("Work schedule updated successfully");
+        setTimeout(() => setScheduleSuccess(null), 3000);
+      } else {
+        const data = await response.json();
+        setScheduleError(data.error || "Failed to update work schedule");
+      }
+    } catch (err) {
+      setScheduleError("An error occurred");
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+
+  const toggleWorkDay = (day: number) => {
+    setWorkDays(prev => 
+      prev.includes(day) 
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
+  const DAYS_OF_WEEK = [
+    { value: 0, label: "Sun" },
+    { value: 1, label: "Mon" },
+    { value: 2, label: "Tue" },
+    { value: 3, label: "Wed" },
+    { value: 4, label: "Thu" },
+    { value: 5, label: "Fri" },
+    { value: 6, label: "Sat" },
+  ];
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,6 +512,107 @@ export default function AdminSettingsPage() {
                   className="bg-orange-500 hover:bg-orange-600 rounded-xl h-12 px-6"
                 >
                   {companyLoading ? "Saving..." : "Save Company Name"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Work Schedule Settings (ADMIN/SUPERUSER) */}
+        {isAdmin && (
+          <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Work Schedule</h2>
+                <p className="text-sm text-slate-500">Configure default work days and shift length</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveWorkSchedule} className="space-y-6">
+              {scheduleSuccess && (
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-3 rounded-xl text-sm">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {scheduleSuccess}
+                </div>
+              )}
+              
+              {scheduleError && (
+                <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm">
+                  <AlertCircle className="h-4 w-4" />
+                  {scheduleError}
+                </div>
+              )}
+
+              {/* Work Days Selection */}
+              <div className="space-y-3">
+                <Label>Default Work Days</Label>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => toggleWorkDay(day.value)}
+                      className={`
+                        px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+                        ${workDays.includes(day.value)
+                          ? "bg-emerald-500 text-white shadow-sm"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        }
+                      `}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400">
+                  Select the days your crew typically works. Jobs will auto-calculate end dates based on these days.
+                </p>
+              </div>
+
+              {/* Shift Hours */}
+              <div className="space-y-2">
+                <Label htmlFor="shiftHours">Shift Length (hours)</Label>
+                <Input
+                  id="shiftHours"
+                  type="number"
+                  value={shiftHours}
+                  onChange={(e) => setShiftHours(Number(e.target.value) || 12)}
+                  placeholder="12"
+                  className="h-12 rounded-xl w-32"
+                  min="1"
+                  max="24"
+                  step="0.5"
+                />
+                <p className="text-xs text-slate-400">
+                  Hours per shift. Used to convert hour estimates to work days.
+                </p>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-slate-50 rounded-xl p-4">
+                <p className="text-sm text-slate-600">
+                  <span className="font-medium">Current schedule:</span>{" "}
+                  {workDays.length === 0 ? (
+                    <span className="text-amber-600">No days selected</span>
+                  ) : (
+                    <>
+                      {DAYS_OF_WEEK.filter(d => workDays.includes(d.value)).map(d => d.label).join(", ")}
+                      {" "}({workDays.length} day{workDays.length !== 1 ? "s" : ""}/week, {shiftHours}hr shifts)
+                    </>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  type="submit" 
+                  disabled={scheduleLoading}
+                  className="bg-emerald-500 hover:bg-emerald-600 rounded-xl h-12 px-6"
+                >
+                  {scheduleLoading ? "Saving..." : "Save Schedule"}
                 </Button>
               </div>
             </form>

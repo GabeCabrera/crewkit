@@ -68,7 +68,7 @@ export function CrewStep({ job, refreshJob, canEdit }: CrewStepProps) {
       const response = await fetch(`/api/job-plans/${job.id}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userIds: [userId] }),
       });
 
       if (response.ok) {
@@ -84,13 +84,11 @@ export function CrewStep({ job, refreshJob, canEdit }: CrewStepProps) {
   };
 
   // Remove assignment
-  const removeAssignment = async (assignmentId: string) => {
-    setIsRemoving(assignmentId);
+  const removeAssignment = async (userId: string) => {
+    setIsRemoving(userId);
     try {
-      const response = await fetch(`/api/job-plans/${job.id}/assign`, {
+      const response = await fetch(`/api/job-plans/${job.id}/assign?userId=${userId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignmentId }),
       });
 
       if (response.ok) {
@@ -143,11 +141,11 @@ export function CrewStep({ job, refreshJob, canEdit }: CrewStepProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => removeAssignment(assignment.id)}
-                    disabled={isRemoving === assignment.id}
+                    onClick={() => removeAssignment(assignment.userId)}
+                    disabled={isRemoving === assignment.userId}
                     className="h-8 w-8 text-slate-400 hover:text-red-500"
                   >
-                    {isRemoving === assignment.id ? (
+                    {isRemoving === assignment.userId ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <X className="h-4 w-4" />

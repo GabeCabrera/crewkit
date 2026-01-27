@@ -35,9 +35,13 @@ import {
   Route,
   ExternalLink,
   ArrowRight,
+  TreePine,
+  Bug,
+  Waves,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { JobPlanData } from "../../job-lifecycle-view";
+import type { JobPlanData, RedLightDocument } from "../../job-lifecycle-view";
 
 interface PermitType {
   id: string;
@@ -147,6 +151,9 @@ function TrafficLightIcon({ cleared }: { cleared: boolean }) {
   );
 }
 
+// Valid check types for red light documents
+type RedLightCheckType = "dot_permit" | "row_confirmed" | "power_lines" | "traffic_control";
+
 export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }: PermitsStepProps) {
   const [permitTypes, setPermitTypes] = useState<PermitType[]>([]);
   const [permits, setPermits] = useState<JobPermit[]>([]);
@@ -158,6 +165,15 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
   const [expandedPermits, setExpandedPermits] = useState<Set<string>>(new Set());
   const [uploadingPermitId, setUploadingPermitId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  
+  // Red Light document upload state
+  const [uploadingCheckType, setUploadingCheckType] = useState<RedLightCheckType | null>(null);
+  const redLightFileInputRefs = useRef<Record<RedLightCheckType, HTMLInputElement | null>>({
+    dot_permit: null,
+    row_confirmed: null,
+    power_lines: null,
+    traffic_control: null,
+  });
 
   // Calculate Red Light status
   const zoneACleared = 
@@ -345,6 +361,43 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
     }
   };
 
+  // Upload red light document
+  const handleRedLightFileUpload = async (checkType: RedLightCheckType, file: File) => {
+    setUploadingCheckType(checkType);
+    try {
+      await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: `/api/job-plans/${job.id}/red-light-documents?checkType=${checkType}`,
+      });
+      await refreshJob();
+    } catch (error) {
+      console.error("Error uploading red light document:", error);
+      alert(error instanceof Error ? error.message : "Failed to upload document");
+    } finally {
+      setUploadingCheckType(null);
+    }
+  };
+
+  // Delete red light document
+  const handleDeleteRedLightDocument = async (documentId: string) => {
+    try {
+      const response = await fetch(
+        `/api/job-plans/${job.id}/red-light-documents?documentId=${documentId}`,
+        { method: "DELETE" }
+      );
+      if (response.ok) {
+        await refreshJob();
+      }
+    } catch (error) {
+      console.error("Error deleting red light document:", error);
+    }
+  };
+
+  // Get documents for a specific check type
+  const getDocumentsForCheck = (checkType: RedLightCheckType): RedLightDocument[] => {
+    return (job.redLightDocuments || []).filter(doc => doc.checkType === checkType);
+  };
+
   // Toggle permit expansion
   const toggleExpanded = (permitId: string) => {
     setExpandedPermits((prev) => {
@@ -522,17 +575,105 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden"
                 >
-                  <div className="px-4 pb-4 pt-2 bg-green-50/50 border-t border-green-100">
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                      Permit Number <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      value={job.dotPermitNumber ?? ""}
-                      onChange={(e) => updateJob({ dotPermitNumber: e.target.value })}
-                      placeholder="Enter DOT permit number..."
-                      className="bg-white"
-                      disabled={!canEdit}
-                    />
+                  <div className="px-4 pb-4 pt-2 bg-green-50/50 border-t border-green-100 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                        Permit Number <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        value={job.dotPermitNumber ?? ""}
+                        onChange={(e) => updateJob({ dotPermitNumber: e.target.value })}
+                        placeholder="Enter DOT permit number..."
+                        className="bg-white"
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    
+                    {/* Document Upload Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-slate-600">
+                          Supporting Documents
+                        </label>
+                        {canEdit && (
+                          <>
+                            <input
+                              ref={(el) => { redLightFileInputRefs.current.dot_permit = el; }}
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleRedLightFileUpload("dot_permit", file);
+                                  e.target.value = "";
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => redLightFileInputRefs.current.dot_permit?.click()}
+                              disabled={uploadingCheckType === "dot_permit"}
+                              className="h-7 text-xs"
+                            >
+                              {uploadingCheckType === "dot_permit" ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <UploadIcon className="h-3 w-3 mr-1" />
+                              )}
+                              Upload
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      
+                      {getDocumentsForCheck("dot_permit").length > 0 ? (
+                        <div className="space-y-1.5">
+                          {getDocumentsForCheck("dot_permit").map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200"
+                            >
+                              <div className="h-7 w-7 rounded bg-slate-100 flex items-center justify-center text-slate-500">
+                                {getFileIcon(doc.fileType)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 truncate">
+                                  {doc.fileName}
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                  {formatFileSize(doc.fileSize)}
+                                </p>
+                              </div>
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-700"
+                                title="Download"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                              {canEdit && (
+                                <button
+                                  onClick={() => handleDeleteRedLightDocument(doc.id)}
+                                  className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <p className="text-xs text-amber-700">Documentation recommended</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -559,18 +700,106 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden"
                 >
-                  <div className="px-4 pb-4 pt-2 bg-green-50/50 border-t border-green-100">
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                      Confirmation Notes
-                    </label>
-                    <Textarea
-                      value={job.rowConfirmationNotes ?? ""}
-                      onChange={(e) => updateJob({ rowConfirmationNotes: e.target.value })}
-                      placeholder="Enter ROW confirmation details..."
-                      className="bg-white resize-none"
-                      rows={2}
-                      disabled={!canEdit}
-                    />
+                  <div className="px-4 pb-4 pt-2 bg-green-50/50 border-t border-green-100 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                        Confirmation Notes
+                      </label>
+                      <Textarea
+                        value={job.rowConfirmationNotes ?? ""}
+                        onChange={(e) => updateJob({ rowConfirmationNotes: e.target.value })}
+                        placeholder="Enter ROW confirmation details..."
+                        className="bg-white resize-none"
+                        rows={2}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    
+                    {/* Document Upload Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-slate-600">
+                          Supporting Documents
+                        </label>
+                        {canEdit && (
+                          <>
+                            <input
+                              ref={(el) => { redLightFileInputRefs.current.row_confirmed = el; }}
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleRedLightFileUpload("row_confirmed", file);
+                                  e.target.value = "";
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => redLightFileInputRefs.current.row_confirmed?.click()}
+                              disabled={uploadingCheckType === "row_confirmed"}
+                              className="h-7 text-xs"
+                            >
+                              {uploadingCheckType === "row_confirmed" ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <UploadIcon className="h-3 w-3 mr-1" />
+                              )}
+                              Upload
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      
+                      {getDocumentsForCheck("row_confirmed").length > 0 ? (
+                        <div className="space-y-1.5">
+                          {getDocumentsForCheck("row_confirmed").map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200"
+                            >
+                              <div className="h-7 w-7 rounded bg-slate-100 flex items-center justify-center text-slate-500">
+                                {getFileIcon(doc.fileType)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 truncate">
+                                  {doc.fileName}
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                  {formatFileSize(doc.fileSize)}
+                                </p>
+                              </div>
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-700"
+                                title="Download"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                              {canEdit && (
+                                <button
+                                  onClick={() => handleDeleteRedLightDocument(doc.id)}
+                                  className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <p className="text-xs text-amber-700">Documentation recommended</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -620,18 +849,106 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden"
                 >
-                  <div className="px-4 pb-4 pt-2 bg-green-50/50 border-t border-green-100">
-                    <label className="text-xs font-medium text-slate-600 mb-1.5 block">
-                      Power Line Notes
-                    </label>
-                    <Textarea
-                      value={job.powerLineNotes ?? ""}
-                      onChange={(e) => updateJob({ powerLineNotes: e.target.value })}
-                      placeholder="Document power line locations and safety measures..."
-                      className="bg-white resize-none"
-                      rows={2}
-                      disabled={!canEdit}
-                    />
+                  <div className="px-4 pb-4 pt-2 bg-green-50/50 border-t border-green-100 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1.5 block">
+                        Power Line Notes
+                      </label>
+                      <Textarea
+                        value={job.powerLineNotes ?? ""}
+                        onChange={(e) => updateJob({ powerLineNotes: e.target.value })}
+                        placeholder="Document power line locations and safety measures..."
+                        className="bg-white resize-none"
+                        rows={2}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    
+                    {/* Document Upload Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-slate-600">
+                          Supporting Documents
+                        </label>
+                        {canEdit && (
+                          <>
+                            <input
+                              ref={(el) => { redLightFileInputRefs.current.power_lines = el; }}
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleRedLightFileUpload("power_lines", file);
+                                  e.target.value = "";
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => redLightFileInputRefs.current.power_lines?.click()}
+                              disabled={uploadingCheckType === "power_lines"}
+                              className="h-7 text-xs"
+                            >
+                              {uploadingCheckType === "power_lines" ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <UploadIcon className="h-3 w-3 mr-1" />
+                              )}
+                              Upload
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      
+                      {getDocumentsForCheck("power_lines").length > 0 ? (
+                        <div className="space-y-1.5">
+                          {getDocumentsForCheck("power_lines").map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200"
+                            >
+                              <div className="h-7 w-7 rounded bg-slate-100 flex items-center justify-center text-slate-500">
+                                {getFileIcon(doc.fileType)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 truncate">
+                                  {doc.fileName}
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                  {formatFileSize(doc.fileSize)}
+                                </p>
+                              </div>
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-700"
+                                title="Download"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                              {canEdit && (
+                                <button
+                                  onClick={() => handleDeleteRedLightDocument(doc.id)}
+                                  className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <p className="text-xs text-amber-700">Documentation recommended</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -649,6 +966,106 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
               icon={<TrafficCone className="h-5 w-5" />}
               className="bg-transparent hover:bg-amber-50/50"
             />
+            
+            <AnimatePresence>
+              {job.redLightTrafficControl && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-4 pb-4 pt-2 bg-green-50/50 border-t border-green-100 space-y-3">
+                    {/* Document Upload Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-slate-600">
+                          Supporting Documents
+                        </label>
+                        {canEdit && (
+                          <>
+                            <input
+                              ref={(el) => { redLightFileInputRefs.current.traffic_control = el; }}
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  handleRedLightFileUpload("traffic_control", file);
+                                  e.target.value = "";
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => redLightFileInputRefs.current.traffic_control?.click()}
+                              disabled={uploadingCheckType === "traffic_control"}
+                              className="h-7 text-xs"
+                            >
+                              {uploadingCheckType === "traffic_control" ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              ) : (
+                                <UploadIcon className="h-3 w-3 mr-1" />
+                              )}
+                              Upload
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      
+                      {getDocumentsForCheck("traffic_control").length > 0 ? (
+                        <div className="space-y-1.5">
+                          {getDocumentsForCheck("traffic_control").map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200"
+                            >
+                              <div className="h-7 w-7 rounded bg-slate-100 flex items-center justify-center text-slate-500">
+                                {getFileIcon(doc.fileType)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 truncate">
+                                  {doc.fileName}
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                  {formatFileSize(doc.fileSize)}
+                                </p>
+                              </div>
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-700"
+                                title="Download"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </a>
+                              {canEdit && (
+                                <button
+                                  onClick={() => handleDeleteRedLightDocument(doc.id)}
+                                  className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <p className="text-xs text-amber-700">Documentation recommended</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
@@ -739,6 +1156,86 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
               )}
             </AnimatePresence>
           </div>
+        </div>
+      </div>
+
+      {/* ============================================ */}
+      {/* ZONE D: JOB SITE HAZARDS */}
+      {/* ============================================ */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 px-1">
+          <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">Zone D: Job Site Hazards</h3>
+            <p className="text-xs text-orange-600 font-medium">Identify hazards before work begins</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {/* Tree Trimming */}
+          <label
+            className={cn(
+              "flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 transition-colors",
+              canEdit && "cursor-pointer hover:bg-slate-100"
+            )}
+          >
+            <Checkbox
+              checked={job.treeTrimming ?? false}
+              disabled={!canEdit}
+              onCheckedChange={(checked) => updateJob({ treeTrimming: checked === true })}
+            />
+            <TreePine className="h-5 w-5 text-green-600" />
+            <span className="font-medium text-slate-700">Tree Trimming Required</span>
+          </label>
+
+          {/* Animal Hazards */}
+          <label
+            className={cn(
+              "flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 transition-colors",
+              canEdit && "cursor-pointer hover:bg-slate-100"
+            )}
+          >
+            <Checkbox
+              checked={job.animalHazards ?? false}
+              disabled={!canEdit}
+              onCheckedChange={(checked) => updateJob({ animalHazards: checked === true })}
+            />
+            <Bug className="h-5 w-5 text-amber-600" />
+            <span className="font-medium text-slate-700">Animal Hazards</span>
+          </label>
+
+          {/* Water/Rail Crossing */}
+          <label
+            className={cn(
+              "flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200 transition-colors",
+              canEdit && "cursor-pointer hover:bg-slate-100"
+            )}
+          >
+            <Checkbox
+              checked={job.waterRailCrossing ?? false}
+              disabled={!canEdit}
+              onCheckedChange={(checked) => updateJob({ waterRailCrossing: checked === true })}
+            />
+            <Waves className="h-5 w-5 text-blue-600" />
+            <span className="font-medium text-slate-700">Water/Rail Crossing</span>
+          </label>
+        </div>
+
+        {/* Foreman Notes */}
+        <div className="space-y-2 pt-2">
+          <label className="text-sm font-medium text-slate-700">Foreman Notes</label>
+          <Textarea
+            value={job.foremanNotes || ""}
+            onChange={(e) => updateJob({ foremanNotes: e.target.value })}
+            placeholder="Enter any additional notes or special instructions..."
+            className="min-h-[100px] rounded-xl"
+            disabled={!canEdit}
+          />
+          <p className="text-xs text-slate-500">
+            Add any special instructions, warnings, or notes for the crew.
+          </p>
         </div>
       </div>
 
@@ -1028,10 +1525,10 @@ export function PermitsStep({ job, updateJob, canEdit, refreshJob, onNavigate }:
       {onNavigate && allCleared && (
         <div className="pt-4 border-t border-slate-200">
           <Button
-            onClick={() => onNavigate("materials")}
+            onClick={() => onNavigate("hazards")}
             className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white gap-2"
           >
-            Continue to Materials
+            Continue to Hazards
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

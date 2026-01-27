@@ -1,9 +1,9 @@
 "use client";
 
-import { LayoutGrid, Calendar, List } from "lucide-react";
+import { Calendar, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ViewMode = "kanban" | "timeline" | "list";
+export type ViewMode = "list" | "calendar";
 
 interface JobViewSwitcherProps {
   currentView: ViewMode;
@@ -11,9 +11,8 @@ interface JobViewSwitcherProps {
 }
 
 const views = [
-  { id: "kanban" as const, label: "Board", icon: LayoutGrid },
-  { id: "timeline" as const, label: "Timeline", icon: Calendar },
   { id: "list" as const, label: "List", icon: List },
+  { id: "calendar" as const, label: "Calendar", icon: Calendar },
 ];
 
 export function JobViewSwitcher({ currentView, onViewChange }: JobViewSwitcherProps) {

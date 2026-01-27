@@ -2,22 +2,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white -m-4 sm:-m-6 lg:-m-8 skeleton-fade-in">
+    <div className="py-6 sm:py-8 skeleton-fade-in">
       {/* Header */}
-      <div className="bg-white border-b border-slate-100">
-        <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-10 w-10 rounded-xl" />
-            <div>
-              <Skeleton className="h-8 w-24 mb-2" />
-              <Skeleton className="h-5 w-48" />
-            </div>
+      <div className="px-4 sm:px-6 lg:px-8 mb-6 sm:mb-8">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-10 w-10 rounded-xl" />
+          <div>
+            <Skeleton className="h-8 w-24 mb-2" />
+            <Skeleton className="h-5 w-48" />
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="px-4 py-6 sm:px-6 sm:py-8 max-w-7xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <Skeleton className="h-6 w-32" />

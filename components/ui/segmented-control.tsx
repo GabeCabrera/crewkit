@@ -30,9 +30,9 @@ export function SegmentedControl<T extends string = string>({
   className,
 }: SegmentedControlProps<T>) {
   const sizeClasses = {
-    sm: "h-8 text-xs px-2.5 gap-1",
-    md: "h-10 text-sm px-3.5 gap-1.5",
-    lg: "h-12 text-base px-4 gap-2",
+    sm: "h-8 text-xs px-2 gap-1",
+    md: "h-9 text-sm px-2.5 gap-1.5",
+    lg: "h-10 text-sm px-3 gap-1.5",
   };
 
   const iconSizeClasses = {
@@ -63,22 +63,22 @@ export function SegmentedControl<T extends string = string>({
             disabled={isDisabled}
             onClick={() => !isDisabled && onChange(option.value)}
             className={cn(
-              "inline-flex items-center justify-center rounded-md font-medium transition-all",
+              "inline-flex items-center justify-center rounded-md font-medium transition-all min-w-0",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2",
               sizeClasses[size],
               fullWidth && "flex-1",
               isSelected
-                ? "bg-white text-slate-900 shadow-sm"
+                ? "bg-orange-500 text-white shadow-sm"
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-50/50",
               isDisabled && "opacity-50 cursor-not-allowed"
             )}
           >
             {option.icon && (
-              <span className={cn(iconSizeClasses[size])}>
+              <span className={cn(iconSizeClasses[size], "shrink-0")}>
                 {option.icon}
               </span>
             )}
-            {option.label}
+            <span className="truncate">{option.label}</span>
           </button>
         );
       })}
@@ -100,10 +100,20 @@ export const primaryMethodOptions: SegmentedControlOption<"aerial" | "undergroun
   { value: "both", label: "Both" },
 ];
 
-// Preset for construction type
+// Preset for construction type (DEPRECATED - use jobBuildTypeOptions)
 export const constructionTypeOptions: SegmentedControlOption<"new_strand" | "overlash" | "adss" | "ug_dip">[] = [
   { value: "new_strand", label: "New Strand" },
   { value: "overlash", label: "Overlash" },
   { value: "adss", label: "ADSS" },
   { value: "ug_dip", label: "UG Dip" },
+];
+
+// Preset for job build type (replaces primaryMethod + constructionType)
+export type JobBuildType = "full_build" | "strand_build" | "fiber_build" | "peripheral_build";
+
+export const jobBuildTypeOptions: SegmentedControlOption<JobBuildType>[] = [
+  { value: "full_build", label: "Full" },
+  { value: "strand_build", label: "Strand" },
+  { value: "fiber_build", label: "Fiber" },
+  { value: "peripheral_build", label: "Periph" },
 ];
