@@ -51,7 +51,6 @@ function isNearFirstVertex(state: any, lngLat: { lng: number; lat: number }, zoo
 
 // Custom draw mode that closes polygon when clicking first vertex
 // Enhanced with ghost closing line, pulse animation support, and professional UX
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const LoopSelectMode: any = {
   ...MapboxDraw.modes.draw_polygon,
 
@@ -1797,7 +1796,7 @@ function FeaturePopupContent({
     return (
       <div>
         <p className="font-semibold text-slate-800">Conduit</p>
-        <p className="text-sm text-slate-600">{props.conduitSize}" diameter</p>
+        <p className="text-sm text-slate-600">{props.conduitSize}&quot; diameter</p>
         <p className="text-sm text-slate-600">
           {Number(props.footage).toLocaleString()} ft
         </p>
