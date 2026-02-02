@@ -11,9 +11,17 @@ import {
   RefreshCw,
   Trash2,
   User,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import Link from "next/link";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface UsageLog {
   id: string;
@@ -60,6 +68,8 @@ export default function FieldTodayPage() {
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+  const [editDate, setEditDate] = useState<Date | undefined>(undefined);
 
   const fetchTodayUsage = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -161,6 +171,30 @@ export default function FieldTodayPage() {
       alert("Failed to delete usage");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleChangeDate = async (logId: string, newDate: Date) => {
+    try {
+      const dateStr = newDate.toISOString().slice(0, 10) + 'T00:00:00.000Z';
+      const response = await fetch(`/api/assemblies/usage/${logId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr }),
+      });
+
+      if (response.ok) {
+        setEditingDateId(null);
+        setEditDate(undefined);
+        // Refetch today's usage (log may disappear if moved to another day)
+        fetchTodayUsage(true);
+      } else {
+        const data = await response.json();
+        alert(data.error || "Failed to change date");
+      }
+    } catch (error) {
+      console.error("Error changing date:", error);
+      alert("Failed to change date");
     }
   };
 
@@ -344,8 +378,43 @@ export default function FieldTodayPage() {
                           </div>
                         </div>
 
-                        {/* Delete button */}
-                        <div className="pt-3 sm:pt-4 border-t mt-3 sm:mt-4">
+                        {/* Actions: Change date and Delete */}
+                        <div className="pt-3 sm:pt-4 border-t mt-3 sm:mt-4 space-y-2">
+                          {/* Change date */}
+                          <Popover open={editingDateId === log.id} onOpenChange={(open) => {
+                            if (open) {
+                              setEditingDateId(log.id);
+                              setEditDate(new Date(log.date));
+                            } else {
+                              setEditingDateId(null);
+                              setEditDate(undefined);
+                            }
+                          }}>
+                            <PopoverTrigger asChild>
+                              <button
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center justify-center gap-2 w-full py-2 sm:py-2.5 text-sm font-medium hover:bg-muted rounded-xl transition-colors"
+                              >
+                                <CalendarIcon className="h-4 w-4" />
+                                Change Date
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="center">
+                              <div className="p-3">
+                                <DatePicker
+                                  date={editDate}
+                                  onDateChange={(date) => {
+                                    if (date) {
+                                      handleChangeDate(log.id, date);
+                                    }
+                                  }}
+                                  placeholder="Select date"
+                                />
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          
+                          {/* Delete button */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();

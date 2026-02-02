@@ -93,7 +93,7 @@ export const createAssemblyUsageSchema = z.object({
   assemblyId: z.string().cuid("Invalid assembly ID"),
   quantity: z.number().int().min(1, "Quantity must be at least 1").default(1),
   modifiers: z.array(assemblyUsageModifierSchema).optional().nullable(),
-  date: z.string().datetime().optional(),
+  date: z.string().optional(), // Accept YYYY-MM-DD or ISO datetime
 });
 
 // ==========================================

@@ -29,7 +29,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { assemblyId, quantity = 1, modifiers } = validation.data;
+    const { assemblyId, quantity = 1, modifiers, date } = validation.data;
+
+    // Parse optional date
+    const usageDate = date 
+      ? (date.includes('T') ? new Date(date) : new Date(date + 'T00:00:00.000Z'))
+      : undefined;
 
     // Verify assembly exists and is approved
     const assembly = await prisma.assembly.findUnique({
@@ -64,6 +69,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         quantity,
         ...(modifiers && { modifiers }),
+        ...(usageDate && { date: usageDate }),
       },
     });
 
@@ -98,6 +104,7 @@ export async function POST(request: NextRequest) {
             quantity: -totalQuantity,
             type: "USED",
             notes: `Used in assembly: ${assembly.name}`,
+            ...(usageDate && { date: usageDate }),
           },
         });
       }
@@ -131,6 +138,7 @@ export async function POST(request: NextRequest) {
               quantity: -modifier.quantity,
               type: "USED",
               notes: `Extra equipment used with assembly: ${assembly.name}`,
+              ...(usageDate && { date: usageDate }),
             },
           });
         }

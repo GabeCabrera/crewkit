@@ -101,7 +101,12 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { modifiers } = body;
+    const { modifiers, date } = body;
+    
+    // Parse optional date
+    const newDate = date 
+      ? (date.includes('T') ? new Date(date) : new Date(date + 'T00:00:00.000Z'))
+      : undefined;
 
     // Get old modifiers
     const oldModifiers = (usageLog.modifiers as any[]) || [];
@@ -167,6 +172,7 @@ export async function PUT(
       where: { id: params.id },
       data: {
         modifiers: modifiers || null,
+        ...(newDate && { date: newDate }),
       },
       include: {
         assembly: {

@@ -18,6 +18,7 @@ import {
   Clock,
   Repeat,
   Sparkles,
+  Calendar,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -26,6 +27,7 @@ import {
   SheetContent,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { DatePicker } from "@/components/ui/date-picker";
 
 interface Equipment {
   id: string;
@@ -100,6 +102,12 @@ export default function FieldAssembliesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [showAllItems, setShowAllItems] = useState(false);
+  const [usageDate, setUsageDate] = useState<Date>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
   const router = useRouter();
 
@@ -179,19 +187,32 @@ export default function FieldAssembliesPage() {
     setModifiers([]);
     setShowModifiers(false);
     setShowAllItems(false);
+    setShowDatePicker(false);
+    // Reset to today when opening new assembly
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setUsageDate(today);
   };
 
   const handleQuickLog = async (assembly: Assembly, qty: number = 1, mods: Modifier[] = []) => {
     setIsSubmitting(true);
     try {
       const validModifiers = mods.filter(m => m.equipmentId && m.quantity > 0);
+      
+      // Include date if not today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isToday = usageDate.getTime() === today.getTime();
+      const dateStr = !isToday ? usageDate.toISOString().slice(0, 10) + 'T00:00:00.000Z' : undefined;
+      
       const response = await fetch("/api/assemblies/usage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           assemblyId: assembly.id, 
           quantity: qty,
-          modifiers: validModifiers 
+          modifiers: validModifiers,
+          ...(dateStr && { date: dateStr }),
         }),
       });
 
@@ -557,6 +578,37 @@ export default function FieldAssembliesPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Usage Date (collapsible) */}
+                <div className="mb-5">
+                  <button
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ChevronDown className={cn("h-4 w-4 transition-transform", showDatePicker && "rotate-180")} />
+                    Log for a different date?
+                    {(() => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const isToday = usageDate.getTime() === today.getTime();
+                      return !isToday && (
+                        <Badge variant="secondary" className="text-xs">
+                          {usageDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </Badge>
+                      );
+                    })()}
+                  </button>
+                  {showDatePicker && (
+                    <div className="mt-3">
+                      <DatePicker
+                        date={usageDate}
+                        onDateChange={(date) => date && setUsageDate(date)}
+                        placeholder="Select date"
+                        className="h-10"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Items Preview */}
