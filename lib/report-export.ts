@@ -869,6 +869,12 @@ export interface MonthlyReportData {
       snowshoesPlaced: number;
     };
   };
+  derivedUsage?: Array<{
+    name: string;
+    quantity: number;
+    sourceFootage?: number;
+    formula?: string;
+  }>;
   fieldLogs: Array<{
     id: string;
     date: string;
@@ -991,12 +997,20 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
     },
   });
 
-  // ============ PAGE 2: INVENTORY USAGE ============
+  // ============ INVENTORY (Usage + Stock) ============
   doc.addPage();
-  addMonthlyPageHeader(doc, "Inventory Usage", data.month);
+  addMonthlyPageHeader(doc, "Inventory", data.month);
+
+  let invY = 35;
+
+  // Equipment usage this month
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Equipment usage this month", 14, invY);
+  invY += 8;
 
   if (data.inventoryUsage.length > 0) {
-    const inventoryTableData = data.inventoryUsage.slice(0, 30).map((item) => [
+    const inventoryTableData = data.inventoryUsage.slice(0, 18).map((item) => [
       item.equipment.name,
       item.equipment.sku,
       item.totalQuantity.toLocaleString(),
@@ -1004,30 +1018,54 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
     ]);
 
     autoTable(doc, {
-      startY: 35,
+      startY: invY,
       head: [["Equipment", "SKU", "Qty Used", "Cost"]],
       body: inventoryTableData,
       theme: "striped",
-      headStyles: { fillColor: [71, 85, 105], fontSize: 10 },
-      bodyStyles: { fontSize: 9 },
+      headStyles: { fillColor: [71, 85, 105], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
       columnStyles: {
         2: { halign: "right" },
         3: { halign: "right" },
       },
     });
+    invY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? invY + 40;
   } else {
-    doc.setFontSize(11);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(100);
-    doc.text("No equipment usage recorded this month.", 14, 45);
+    doc.text("No equipment usage recorded this month.", 14, invY);
     doc.setTextColor(0);
+    invY += 12;
   }
 
-  // ============ PAGE 3: STOCK COMPARISON ============
-  doc.addPage();
-  addMonthlyPageHeader(doc, "Stock Level Changes", data.month);
+  invY += 10;
+
+  // Derived usage (from field work)
+  const derivedWithQty = data.derivedUsage?.filter((d) => d.quantity > 0) ?? [];
+  if (derivedWithQty.length > 0) {
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Derived usage (from field work)", 14, invY);
+    invY += 8;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    derivedWithQty.forEach((item) => {
+      const note = item.formula ? ` — ${item.formula}` : "";
+      doc.text(`${item.name}: ${item.quantity.toLocaleString()}${note}`, 14, invY);
+      invY += 6;
+    });
+    invY += 6;
+  }
+
+  // Stock level changes
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Stock level changes", 14, invY);
+  invY += 8;
 
   if (data.stockComparison.length > 0) {
-    const stockTableData = data.stockComparison.slice(0, 30).map((item) => [
+    const stockTableData = data.stockComparison.slice(0, 18).map((item) => [
       item.equipment.name,
       item.equipment.sku,
       item.startOfMonthQuantity.toLocaleString(),
@@ -1037,12 +1075,12 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
     ]);
 
     autoTable(doc, {
-      startY: 35,
+      startY: invY,
       head: [["Equipment", "SKU", "Start", "Current", "Change", "% Change"]],
       body: stockTableData,
       theme: "striped",
-      headStyles: { fillColor: [71, 85, 105], fontSize: 10 },
-      bodyStyles: { fontSize: 9 },
+      headStyles: { fillColor: [71, 85, 105], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
       columnStyles: {
         2: { halign: "right" },
         3: { halign: "right" },
@@ -1051,38 +1089,21 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
       },
     });
   } else {
-    doc.setFontSize(11);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(100);
-    doc.text("No stock level changes this month.", 14, 45);
+    doc.text("No stock level changes this month.", 14, invY);
     doc.setTextColor(0);
   }
 
-  // ============ PAGE 4: FIELD WORK SUMMARY ============
+  // ============ FIELD WORK SUMMARY ============
   doc.addPage();
   addMonthlyPageHeader(doc, "Field Work Summary", data.month);
 
   const { fieldWorkSummary: fw } = data;
 
-  // Overview stats
-  const fwOverview = [
-    ["Total Work Logs", String(fw.totalLogs)],
-    ["Total Hours Worked", fw.totalHoursWorked.toLocaleString()],
-    ["Unique Workers", String(fw.uniqueWorkers)],
-  ];
-
-  autoTable(doc, {
-    startY: 35,
-    body: fwOverview,
-    theme: "plain",
-    bodyStyles: { fontSize: 11 },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 60 },
-      1: { halign: "right" },
-    },
-  });
-
   // Aerial work
-  let currentY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 70;
+  let currentY = 35;
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.text("Aerial Construction", 14, currentY + 15);
@@ -1157,38 +1178,7 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
     },
   });
 
-  // ============ PAGE 5: FIELD LOGS TABLE ============
-  if (data.fieldLogs.length > 0) {
-    doc.addPage();
-    addMonthlyPageHeader(doc, "Daily Field Logs", data.month);
-
-    const logsTableData = data.fieldLogs.slice(0, 40).map((log) => [
-      new Date(log.date).toLocaleDateString(),
-      log.location.substring(0, 20) + (log.location.length > 20 ? "..." : ""),
-      String(log.workerCount),
-      log.hoursWorked.toFixed(1),
-      (log.aerial.strandHungFootage || 0).toLocaleString(),
-      String(log.aerial.polesAttached || 0),
-      log.submittedBy.split(" ")[0],
-    ]);
-
-    autoTable(doc, {
-      startY: 35,
-      head: [["Date", "Location", "Crew", "Hours", "Strand (ft)", "Poles", "Submitted By"]],
-      body: logsTableData,
-      theme: "striped",
-      headStyles: { fillColor: [71, 85, 105], fontSize: 9 },
-      bodyStyles: { fontSize: 8 },
-      columnStyles: {
-        2: { halign: "center" },
-        3: { halign: "right" },
-        4: { halign: "right" },
-        5: { halign: "right" },
-      },
-    });
-  }
-
-  // ============ PAGE 6: ASSEMBLY USAGE ============
+  // ============ ASSEMBLY USAGE ============
   doc.addPage();
   addMonthlyPageHeader(doc, "Assembly Usage", data.month);
 
@@ -1220,7 +1210,7 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
     doc.setTextColor(0);
   }
 
-  // ============ PAGE 7: JOB PROGRESS ============
+  // ============ JOB PROGRESS ============
   doc.addPage();
   addMonthlyPageHeader(doc, "Job Progress", data.month);
 
@@ -1326,6 +1316,18 @@ export function generateMonthlyInventoryCSV(data: MonthlyReportData): string {
     cost: item.totalCost.toFixed(2),
     usageCount: item.usageCount,
   }));
+
+  const derivedWithQty = data.derivedUsage?.filter((d) => d.quantity > 0) ?? [];
+  derivedWithQty.forEach((item) => {
+    csvData.push({
+      name: item.name,
+      sku: "-",
+      unitType: "-",
+      quantityUsed: item.quantity,
+      cost: "0.00",
+      usageCount: 0,
+    });
+  });
 
   return generateCSV(csvData, [
     { key: "name", header: "Equipment Name" },

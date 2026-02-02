@@ -210,6 +210,20 @@ export async function GET(request: NextRequest) {
     };
 
     // ============================================
+    // 3b. DERIVED USAGE (from field work)
+    // ============================================
+    const fiberPulledFootage = fieldWorkSummary.aerial.fiberPulledFootage;
+    const lashingWireRolls = fiberPulledFootage > 0 ? Math.ceil(fiberPulledFootage / 500) : 0;
+    const derivedUsage = [
+      {
+        name: "Lashing wire (rolls)",
+        quantity: lashingWireRolls,
+        sourceFootage: fiberPulledFootage,
+        formula: "500 ft fiber pulled per roll",
+      },
+    ];
+
+    // ============================================
     // 4. ASSEMBLY USAGE FOR THE MONTH
     // ============================================
     const assemblyUsageLogs = await prisma.assemblyUsageLog.findMany({
@@ -389,6 +403,7 @@ export async function GET(request: NextRequest) {
       })),
       assemblyUsage,
       jobProgress,
+      derivedUsage,
     });
   } catch (error) {
     console.error("Error fetching monthly report:", error);
