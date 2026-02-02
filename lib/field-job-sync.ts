@@ -365,7 +365,7 @@ export async function getJobFieldLogsSummary(jobPlanId: string) {
       0
     ),
     totalPoles: logs.reduce((sum, log) => sum + (log.polesAttached || 0), 0),
-    dates: [...new Set(logs.map(log => log.date.toISOString().split('T')[0]))],
+    dates: Array.from(new Set(logs.map(log => log.date.toISOString().split('T')[0]))),
   };
 }
 

@@ -227,9 +227,9 @@ export function calculateStatsByFileId<T extends Feature>(
   const grouped = groupFeaturesByFileId(features);
   const stats = new Map<string, FeatureStats>();
 
-  for (const [fileId, groupFeatures] of grouped) {
+  grouped.forEach((groupFeatures, fileId) => {
     stats.set(fileId, calculateFeatureStats(groupFeatures));
-  }
+  });
 
   return stats;
 }

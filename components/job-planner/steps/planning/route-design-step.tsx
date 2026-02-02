@@ -116,6 +116,8 @@ export interface InfrastructureItem {
   specs?: string;
   label?: string;
   subPhase?: string;
+  poleType?: string | null;
+  tailFootage?: number | null;
   location?: { type: "Point"; coordinates: [number, number] };
   isSelected?: boolean;
   isCompleted?: boolean;
@@ -696,10 +698,10 @@ export function RouteDesignStep({ job, updateJob, refreshJob, canEdit }: RouteDe
         itemType: item.itemType,
         label: item.label,
         specs: item.specs,
-        poleType: item.poleType,
+        poleType: item.poleType ?? undefined,
         quantity: item.quantity || 1,
         location: item.location,
-        tailFootage: item.tailFootage, // Pass MST tail footage
+        tailFootage: item.tailFootage ?? undefined, // Pass MST tail footage
       })),
       selectedFiber.map(seg => ({
         id: seg.id,

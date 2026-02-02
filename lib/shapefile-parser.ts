@@ -797,7 +797,9 @@ export async function parseShapefiles(
     sourceFiles: [],
   };
   
-  for (const [filename, buffers] of files.entries()) {
+  const entries = Array.from(files.entries());
+  for (let i = 0; i < entries.length; i++) {
+    const [filename, buffers] = entries[i];
     const layerType = getLayerType(filename);
     if (!layerType) {
       console.warn(`Unknown layer type for file: ${filename}`);

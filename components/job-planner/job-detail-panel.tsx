@@ -47,6 +47,8 @@ import { getAvailableStatusOptions, JobPlanStatus } from "@/lib/validations";
 import { useJobPlan, jobPlanKeys } from "@/lib/queries/job-plans";
 import type { JobPlanData } from "./job-lifecycle-view";
 
+type JobPermitItem = NonNullable<JobPlanData["permits"]>[number];
+
 interface Assignment {
   id: string;
   user: {
@@ -294,7 +296,7 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
   ].filter(Boolean) as { icon: typeof Car; label: string }[] : [];
 
   const unassignedUsers = job ? availableUsers.filter(
-    (user) => !job.assignments.some((a) => a.user.id === user.id)
+    (user) => !job.assignments.some((a: Assignment) => a.user.id === user.id)
   ) : [];
 
   return (
@@ -468,14 +470,14 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
               <span className="text-sm font-medium">Permits</span>
               {job.permits && job.permits.length > 0 && (
                 <Badge variant="outline" className="ml-auto text-xs">
-                  {job.permits.filter(p => p.isApproved).length}/{job.permits.length} approved
+                  {job.permits.filter((p: JobPermitItem) => p.isApproved).length}/{job.permits.length} approved
                 </Badge>
               )}
             </div>
             
             {job.permits && job.permits.length > 0 ? (
               <div className="space-y-2">
-                {job.permits.map((permit) => {
+                {job.permits.map((permit: JobPermitItem) => {
                   const isExpanded = expandedPermits.has(permit.id);
                   const hasDocuments = permit.documents.length > 0;
                   
@@ -589,7 +591,7 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
 
             {job.assignments.length > 0 ? (
               <div className="space-y-2 mb-3">
-                {job.assignments.map((assignment) => (
+                {job.assignments.map((assignment: Assignment) => (
                   <div
                     key={assignment.id}
                     className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"

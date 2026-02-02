@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeRateLimit } from "@/lib/rate-limit";
@@ -145,7 +146,7 @@ export async function POST(
             footage: seg.footage,
             cableType: seg.cableType || null,
             description: seg.description || null,
-            geometry: seg.geometry || null,
+            geometry: seg.geometry != null ? (seg.geometry as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
             sourceFileId: seg.sourceFileId || null,
           })),
         },
@@ -158,7 +159,7 @@ export async function POST(
             subPhase: item.subPhase || null,
             poleType: item.poleType || null,
             tailFootage: item.tailFootage || null,
-            location: item.location || null,
+            location: item.location != null ? (item.location as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
             sourceFileId: item.sourceFileId || null,
           })),
         },
@@ -168,7 +169,7 @@ export async function POST(
             footage: seg.footage,
             conduitType: seg.conduitType || null,
             description: seg.description || null,
-            geometry: seg.geometry || null,
+            geometry: seg.geometry != null ? (seg.geometry as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
             sourceFileId: seg.sourceFileId || null,
           })),
         },
