@@ -780,3 +780,598 @@ export function sanitizeFilename(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 }
+
+// ============================================
+// Monthly Report Types & Generation
+// ============================================
+
+export interface MonthlyReportData {
+  month: string;
+  dateRange: { start: string; end: string };
+  executiveSummary: {
+    month: string;
+    dateRange: { start: string; end: string };
+    inventory: {
+      itemsUsed: number;
+      totalCost: number;
+      topItems: Array<{
+        equipment: { name: string; sku: string };
+        totalQuantity: number;
+        totalCost: number;
+      }>;
+    };
+    fieldWork: {
+      totalLogs: number;
+      totalHours: number;
+      totalFootage: number;
+      polesCompleted: number;
+      uniqueWorkers: number;
+    };
+    assemblies: {
+      totalUsed: number;
+      uniqueTypes: number;
+    };
+    jobs: {
+      total: number;
+      completed: number;
+      inProgress: number;
+    };
+  };
+  inventoryUsage: Array<{
+    equipment: {
+      id: string;
+      name: string;
+      sku: string;
+      pricePerUnit: number;
+      unitType: string;
+    };
+    totalQuantity: number;
+    totalCost: number;
+    usageCount: number;
+  }>;
+  stockComparison: Array<{
+    equipment: {
+      id: string;
+      name: string;
+      sku: string;
+      unitType: string;
+    };
+    currentQuantity: number;
+    startOfMonthQuantity: number;
+    change: number;
+    changePercent: string;
+  }>;
+  fieldWorkSummary: {
+    totalLogs: number;
+    totalHoursWorked: number;
+    uniqueWorkers: number;
+    aerial: {
+      strandHungFootage: number;
+      polesAttached: number;
+      fiberLashedFootage: number;
+      fiberPulledFootage: number;
+    };
+    underground: {
+      drilledFootage: number;
+      plowedFootage: number;
+      trenchedFootage: number;
+      conduitPlacedFootage: number;
+    };
+    infrastructure: {
+      handholesPlaced: number;
+      vaultsPlaced: number;
+      mstsInstalled: number;
+      guysPlaced: number;
+      slackLoops: number;
+      risersInstalled: number;
+      spliceCases: number;
+      anchorsPlaced: number;
+      snowshoesPlaced: number;
+    };
+  };
+  fieldLogs: Array<{
+    id: string;
+    date: string;
+    location: string;
+    workersNames: string[];
+    workerCount: number;
+    hoursWorked: number;
+    submittedBy: string;
+    team: { id: string; name: string } | null;
+    jobPlan: { id: string; jobName: string; jobNumber: string | null } | null;
+    aerial: {
+      strandHungFootage: number | null;
+      polesAttached: number | null;
+      fiberLashedFootage: number | null;
+      fiberPulledFootage: number | null;
+    };
+    underground: {
+      drilledFootage: number | null;
+      plowedFootage: number | null;
+      trenchedFootage: number | null;
+      conduitPlacedFootage: number | null;
+    };
+    infrastructure: {
+      handholesPlaced: number | null;
+      vaultsPlaced: number | null;
+      mstsInstalled: number | null;
+      guysPlaced: number | null;
+    };
+    notes: string | null;
+    issues: string | null;
+  }>;
+  assemblyUsage: Array<{
+    assembly: {
+      id: string;
+      name: string;
+      description: string | null;
+      category: { name: string } | null;
+      type: { name: string } | null;
+    };
+    totalQuantity: number;
+    usageCount: number;
+  }>;
+  jobProgress: Array<{
+    id: string;
+    jobName: string;
+    jobNumber: string | null;
+    locationName: string | null;
+    status: string;
+    totalDistance: number;
+    actualFootage: number;
+    poleCount: number;
+    actualPolesComplete: number;
+    totalCrewHours: number;
+    foremanSignoff: boolean;
+    progressPercent: number;
+    poleProgress: number;
+  }>;
+}
+
+/**
+ * Generates a comprehensive monthly report PDF
+ */
+export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // ============ COVER PAGE ============
+  doc.setFillColor(30, 41, 59); // slate-800
+  doc.rect(0, 0, pageWidth, 90, "F");
+
+  doc.setTextColor(255);
+  doc.setFontSize(32);
+  doc.setFont("helvetica", "bold");
+  doc.text("MONTHLY REPORT", pageWidth / 2, 35, { align: "center" });
+
+  doc.setFontSize(20);
+  doc.setFont("helvetica", "normal");
+  doc.text(data.month, pageWidth / 2, 55, { align: "center" });
+
+  doc.setFontSize(12);
+  doc.text(
+    `${data.dateRange.start} - ${data.dateRange.end}`,
+    pageWidth / 2,
+    70,
+    { align: "center" }
+  );
+
+  doc.setTextColor(0);
+  doc.setFontSize(10);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 105, {
+    align: "center",
+  });
+
+  // ============ EXECUTIVE SUMMARY ============
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("Executive Summary", 14, 125);
+
+  const { executiveSummary: summary } = data;
+
+  // Key metrics in a grid
+  const summaryData = [
+    ["Field Work", `${summary.fieldWork.totalLogs} logs | ${summary.fieldWork.totalHours.toLocaleString()} hrs | ${summary.fieldWork.totalFootage.toLocaleString()} ft`],
+    ["Poles Completed", String(summary.fieldWork.polesCompleted)],
+    ["Unique Workers", String(summary.fieldWork.uniqueWorkers)],
+    ["Assemblies Used", `${summary.assemblies.totalUsed} (${summary.assemblies.uniqueTypes} types)`],
+    ["Inventory Cost", `$${summary.inventory.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+    ["Jobs", `${summary.jobs.total} total | ${summary.jobs.completed} completed | ${summary.jobs.inProgress} in progress`],
+  ];
+
+  autoTable(doc, {
+    startY: 130,
+    body: summaryData,
+    theme: "plain",
+    bodyStyles: { fontSize: 11 },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 50 },
+      1: { halign: "left" },
+    },
+  });
+
+  // ============ PAGE 2: INVENTORY USAGE ============
+  doc.addPage();
+  addMonthlyPageHeader(doc, "Inventory Usage", data.month);
+
+  if (data.inventoryUsage.length > 0) {
+    const inventoryTableData = data.inventoryUsage.slice(0, 30).map((item) => [
+      item.equipment.name,
+      item.equipment.sku,
+      item.totalQuantity.toLocaleString(),
+      `$${item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [["Equipment", "SKU", "Qty Used", "Cost"]],
+      body: inventoryTableData,
+      theme: "striped",
+      headStyles: { fillColor: [71, 85, 105], fontSize: 10 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        2: { halign: "right" },
+        3: { halign: "right" },
+      },
+    });
+  } else {
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text("No equipment usage recorded this month.", 14, 45);
+    doc.setTextColor(0);
+  }
+
+  // ============ PAGE 3: STOCK COMPARISON ============
+  doc.addPage();
+  addMonthlyPageHeader(doc, "Stock Level Changes", data.month);
+
+  if (data.stockComparison.length > 0) {
+    const stockTableData = data.stockComparison.slice(0, 30).map((item) => [
+      item.equipment.name,
+      item.equipment.sku,
+      item.startOfMonthQuantity.toLocaleString(),
+      item.currentQuantity.toLocaleString(),
+      (item.change >= 0 ? "+" : "") + item.change.toLocaleString(),
+      item.changePercent + "%",
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [["Equipment", "SKU", "Start", "Current", "Change", "% Change"]],
+      body: stockTableData,
+      theme: "striped",
+      headStyles: { fillColor: [71, 85, 105], fontSize: 10 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        2: { halign: "right" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+        5: { halign: "right" },
+      },
+    });
+  } else {
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text("No stock level changes this month.", 14, 45);
+    doc.setTextColor(0);
+  }
+
+  // ============ PAGE 4: FIELD WORK SUMMARY ============
+  doc.addPage();
+  addMonthlyPageHeader(doc, "Field Work Summary", data.month);
+
+  const { fieldWorkSummary: fw } = data;
+
+  // Overview stats
+  const fwOverview = [
+    ["Total Work Logs", String(fw.totalLogs)],
+    ["Total Hours Worked", fw.totalHoursWorked.toLocaleString()],
+    ["Unique Workers", String(fw.uniqueWorkers)],
+  ];
+
+  autoTable(doc, {
+    startY: 35,
+    body: fwOverview,
+    theme: "plain",
+    bodyStyles: { fontSize: 11 },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 60 },
+      1: { halign: "right" },
+    },
+  });
+
+  // Aerial work
+  let currentY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 70;
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Aerial Construction", 14, currentY + 15);
+
+  const aerialData = [
+    ["Strand Hung", `${fw.aerial.strandHungFootage.toLocaleString()} ft`],
+    ["Poles Attached", String(fw.aerial.polesAttached)],
+    ["Fiber Lashed", `${fw.aerial.fiberLashedFootage.toLocaleString()} ft`],
+    ["Fiber Pulled", `${fw.aerial.fiberPulledFootage.toLocaleString()} ft`],
+  ];
+
+  autoTable(doc, {
+    startY: currentY + 20,
+    body: aerialData,
+    theme: "plain",
+    bodyStyles: { fontSize: 10 },
+    columnStyles: {
+      0: { cellWidth: 50 },
+      1: { halign: "right" },
+    },
+  });
+
+  // Underground work
+  currentY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 130;
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Underground Construction", 14, currentY + 15);
+
+  const ugData = [
+    ["Drilled", `${fw.underground.drilledFootage.toLocaleString()} ft`],
+    ["Plowed", `${fw.underground.plowedFootage.toLocaleString()} ft`],
+    ["Trenched", `${fw.underground.trenchedFootage.toLocaleString()} ft`],
+    ["Conduit Placed", `${fw.underground.conduitPlacedFootage.toLocaleString()} ft`],
+  ];
+
+  autoTable(doc, {
+    startY: currentY + 20,
+    body: ugData,
+    theme: "plain",
+    bodyStyles: { fontSize: 10 },
+    columnStyles: {
+      0: { cellWidth: 50 },
+      1: { halign: "right" },
+    },
+  });
+
+  // Infrastructure
+  currentY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 180;
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Infrastructure", 14, currentY + 15);
+
+  const infraData = [
+    ["Handholes", String(fw.infrastructure.handholesPlaced)],
+    ["Vaults", String(fw.infrastructure.vaultsPlaced)],
+    ["MSTs Installed", String(fw.infrastructure.mstsInstalled)],
+    ["Guys Placed", String(fw.infrastructure.guysPlaced)],
+    ["Slack Loops", String(fw.infrastructure.slackLoops)],
+    ["Risers", String(fw.infrastructure.risersInstalled)],
+    ["Splice Cases", String(fw.infrastructure.spliceCases)],
+    ["Anchors", String(fw.infrastructure.anchorsPlaced)],
+  ];
+
+  autoTable(doc, {
+    startY: currentY + 20,
+    body: infraData,
+    theme: "plain",
+    bodyStyles: { fontSize: 10 },
+    columnStyles: {
+      0: { cellWidth: 50 },
+      1: { halign: "right" },
+    },
+  });
+
+  // ============ PAGE 5: FIELD LOGS TABLE ============
+  if (data.fieldLogs.length > 0) {
+    doc.addPage();
+    addMonthlyPageHeader(doc, "Daily Field Logs", data.month);
+
+    const logsTableData = data.fieldLogs.slice(0, 40).map((log) => [
+      new Date(log.date).toLocaleDateString(),
+      log.location.substring(0, 20) + (log.location.length > 20 ? "..." : ""),
+      String(log.workerCount),
+      log.hoursWorked.toFixed(1),
+      (log.aerial.strandHungFootage || 0).toLocaleString(),
+      String(log.aerial.polesAttached || 0),
+      log.submittedBy.split(" ")[0],
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [["Date", "Location", "Crew", "Hours", "Strand (ft)", "Poles", "Submitted By"]],
+      body: logsTableData,
+      theme: "striped",
+      headStyles: { fillColor: [71, 85, 105], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        2: { halign: "center" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+        5: { halign: "right" },
+      },
+    });
+  }
+
+  // ============ PAGE 6: ASSEMBLY USAGE ============
+  doc.addPage();
+  addMonthlyPageHeader(doc, "Assembly Usage", data.month);
+
+  if (data.assemblyUsage.length > 0) {
+    const assemblyTableData = data.assemblyUsage.slice(0, 30).map((item) => [
+      item.assembly.name,
+      item.assembly.category?.name || "-",
+      item.assembly.type?.name || "-",
+      item.totalQuantity.toLocaleString(),
+      String(item.usageCount),
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [["Assembly", "Category", "Type", "Qty Used", "Times Used"]],
+      body: assemblyTableData,
+      theme: "striped",
+      headStyles: { fillColor: [71, 85, 105], fontSize: 10 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        3: { halign: "right" },
+        4: { halign: "right" },
+      },
+    });
+  } else {
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text("No assembly usage recorded this month.", 14, 45);
+    doc.setTextColor(0);
+  }
+
+  // ============ PAGE 7: JOB PROGRESS ============
+  doc.addPage();
+  addMonthlyPageHeader(doc, "Job Progress", data.month);
+
+  if (data.jobProgress.length > 0) {
+    const jobTableData = data.jobProgress.slice(0, 25).map((job) => [
+      job.jobName,
+      job.locationName?.substring(0, 20) || "-",
+      job.status.replace("_", " "),
+      `${job.progressPercent}%`,
+      `${job.actualFootage.toLocaleString()} / ${job.totalDistance.toLocaleString()} ft`,
+      `${job.actualPolesComplete} / ${job.poleCount}`,
+      job.foremanSignoff ? "Yes" : "No",
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [["Job Name", "Location", "Status", "Progress", "Footage", "Poles", "Signed"]],
+      body: jobTableData,
+      theme: "striped",
+      headStyles: { fillColor: [71, 85, 105], fontSize: 9 },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        3: { halign: "center" },
+        6: { halign: "center" },
+      },
+    });
+  } else {
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text("No job activity this month.", 14, 45);
+    doc.setTextColor(0);
+  }
+
+  // ============ ADD FOOTERS TO ALL PAGES ============
+  addMonthlyReportFooter(doc, data.month);
+
+  return doc;
+}
+
+/**
+ * Adds a header to monthly report pages
+ */
+function addMonthlyPageHeader(doc: jsPDF, title: string, month: string): void {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(title, 14, 20);
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(100);
+  doc.text(month, pageWidth - 14, 20, { align: "right" });
+  doc.setTextColor(0);
+
+  // Divider line
+  doc.setDrawColor(200);
+  doc.line(14, 25, pageWidth - 14, 25);
+}
+
+/**
+ * Adds footers to all pages of monthly report
+ */
+function addMonthlyReportFooter(doc: jsPDF, month: string): void {
+  const totalPages = doc.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+
+    // Page number
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, {
+      align: "center",
+    });
+
+    // Month on left
+    doc.text(`Monthly Report - ${month}`, 14, pageHeight - 10);
+
+    // Generated date on right
+    doc.text(
+      new Date().toLocaleDateString(),
+      pageWidth - 14,
+      pageHeight - 10,
+      { align: "right" }
+    );
+
+    doc.setTextColor(0);
+  }
+}
+
+/**
+ * Generates CSV for monthly inventory usage
+ */
+export function generateMonthlyInventoryCSV(data: MonthlyReportData): string {
+  const csvData = data.inventoryUsage.map((item) => ({
+    name: item.equipment.name,
+    sku: item.equipment.sku,
+    unitType: item.equipment.unitType,
+    quantityUsed: item.totalQuantity,
+    cost: item.totalCost.toFixed(2),
+    usageCount: item.usageCount,
+  }));
+
+  return generateCSV(csvData, [
+    { key: "name", header: "Equipment Name" },
+    { key: "sku", header: "SKU" },
+    { key: "unitType", header: "Unit Type" },
+    { key: "quantityUsed", header: "Quantity Used" },
+    { key: "cost", header: "Total Cost ($)" },
+    { key: "usageCount", header: "Usage Count" },
+  ]);
+}
+
+/**
+ * Generates CSV for monthly field logs
+ */
+export function generateMonthlyFieldLogsCSV(data: MonthlyReportData): string {
+  const csvData = data.fieldLogs.map((log) => ({
+    date: new Date(log.date).toLocaleDateString(),
+    location: log.location,
+    workers: log.workersNames.join("; "),
+    workerCount: log.workerCount,
+    hoursWorked: log.hoursWorked,
+    submittedBy: log.submittedBy,
+    jobName: log.jobPlan?.jobName || "",
+    strandHung: log.aerial.strandHungFootage || 0,
+    polesAttached: log.aerial.polesAttached || 0,
+    fiberLashed: log.aerial.fiberLashedFootage || 0,
+    drilledFootage: log.underground.drilledFootage || 0,
+    conduitPlaced: log.underground.conduitPlacedFootage || 0,
+    notes: log.notes || "",
+    issues: log.issues || "",
+  }));
+
+  return generateCSV(csvData, [
+    { key: "date", header: "Date" },
+    { key: "location", header: "Location" },
+    { key: "workers", header: "Workers" },
+    { key: "workerCount", header: "Crew Size" },
+    { key: "hoursWorked", header: "Hours" },
+    { key: "submittedBy", header: "Submitted By" },
+    { key: "jobName", header: "Job" },
+    { key: "strandHung", header: "Strand (ft)" },
+    { key: "polesAttached", header: "Poles" },
+    { key: "fiberLashed", header: "Fiber Lashed (ft)" },
+    { key: "drilledFootage", header: "Drilled (ft)" },
+    { key: "conduitPlaced", header: "Conduit (ft)" },
+    { key: "notes", header: "Notes" },
+    { key: "issues", header: "Issues" },
+  ]);
+}

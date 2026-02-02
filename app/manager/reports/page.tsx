@@ -54,8 +54,10 @@ import {
   AlertTriangle,
   Loader2,
   Map,
+  Download,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { MonthlyReportExport } from "@/components/reports/monthly-report-export";
 
 // Dynamically import ProgressMap to avoid SSR issues with Mapbox
 const ProgressMap = dynamic(
@@ -154,7 +156,7 @@ export default function ManagerReportsPage() {
         />
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
             <TabsTrigger value="overview" className="gap-2">
               <Activity className="h-4 w-4" />
               <span className="hidden sm:inline">Today</span>
@@ -170,6 +172,10 @@ export default function ManagerReportsPage() {
             <TabsTrigger value="submit" className="gap-2">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Submit</span>
+            </TabsTrigger>
+            <TabsTrigger value="monthly" className="gap-2">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Monthly</span>
             </TabsTrigger>
           </TabsList>
 
@@ -187,6 +193,10 @@ export default function ManagerReportsPage() {
 
           <TabsContent value="submit" className="space-y-6">
             <SubmitLogTab />
+          </TabsContent>
+
+          <TabsContent value="monthly" className="space-y-6">
+            <MonthlyReportExport />
           </TabsContent>
         </Tabs>
       </div>
