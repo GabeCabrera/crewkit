@@ -15,13 +15,8 @@ import {
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import Link from "next/link";
-import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 interface UsageLog {
   id: string;
@@ -69,7 +64,7 @@ export default function FieldTodayPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
-  const [editDate, setEditDate] = useState<Date | undefined>(undefined);
+  const [editDate, setEditDate] = useState<string>("");
 
   const fetchTodayUsage = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -174,9 +169,10 @@ export default function FieldTodayPage() {
     }
   };
 
-  const handleChangeDate = async (logId: string, newDate: Date) => {
+  const handleChangeDate = async (logId: string, newDateStr: string) => {
     try {
-      const dateStr = newDate.toISOString().slice(0, 10) + 'T00:00:00.000Z';
+      // newDateStr is in YYYY-MM-DD format from the input
+      const dateStr = newDateStr + 'T00:00:00.000Z';
       const response = await fetch(`/api/assemblies/usage/${logId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -185,7 +181,7 @@ export default function FieldTodayPage() {
 
       if (response.ok) {
         setEditingDateId(null);
-        setEditDate(undefined);
+        setEditDate("");
         // Refetch today's usage (log may disappear if moved to another day)
         fetchTodayUsage(true);
       } else {
@@ -381,38 +377,54 @@ export default function FieldTodayPage() {
                         {/* Actions: Change date and Delete */}
                         <div className="pt-3 sm:pt-4 border-t mt-3 sm:mt-4 space-y-2">
                           {/* Change date */}
-                          <Popover open={editingDateId === log.id} onOpenChange={(open) => {
-                            if (open) {
-                              setEditingDateId(log.id);
-                              setEditDate(new Date(log.date));
-                            } else {
-                              setEditingDateId(null);
-                              setEditDate(undefined);
-                            }
-                          }}>
-                            <PopoverTrigger asChild>
-                              <button
+                          {editingDateId === log.id ? (
+                            <div className="flex gap-2 items-center p-2">
+                              <Input
+                                type="date"
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                                className="flex-1"
                                 onClick={(e) => e.stopPropagation()}
-                                className="flex items-center justify-center gap-2 w-full py-2 sm:py-2.5 text-sm font-medium hover:bg-muted rounded-xl transition-colors"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (editDate) {
+                                    handleChangeDate(log.id, editDate);
+                                  }
+                                }}
                               >
-                                <CalendarIcon className="h-4 w-4" />
-                                Change Date
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="center">
-                              <div className="p-3">
-                                <DatePicker
-                                  date={editDate}
-                                  onDateChange={(date) => {
-                                    if (date) {
-                                      handleChangeDate(log.id, date);
-                                    }
-                                  }}
-                                  placeholder="Select date"
-                                />
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingDateId(null);
+                                  setEditDate("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingDateId(log.id);
+                                // Format date as YYYY-MM-DD for the input
+                                const logDate = new Date(log.date);
+                                const formatted = logDate.toISOString().slice(0, 10);
+                                setEditDate(formatted);
+                              }}
+                              className="flex items-center justify-center gap-2 w-full py-2 sm:py-2.5 text-sm font-medium hover:bg-muted rounded-xl transition-colors"
+                            >
+                              <CalendarIcon className="h-4 w-4" />
+                              Change Date
+                            </button>
+                          )}
                           
                           {/* Delete button */}
                           <button
