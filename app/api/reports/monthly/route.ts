@@ -349,7 +349,6 @@ export async function GET(request: NextRequest) {
         totalLogs: fieldWorkSummary.totalLogs,
         totalHours: fieldWorkSummary.totalHoursWorked,
         totalFootage: totalFieldFootage,
-        polesCompleted: fieldWorkSummary.aerial.polesAttached,
         uniqueWorkers: fieldWorkSummary.uniqueWorkers,
       },
       assemblies: {

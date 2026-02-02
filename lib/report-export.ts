@@ -804,7 +804,6 @@ export interface MonthlyReportData {
       totalLogs: number;
       totalHours: number;
       totalFootage: number;
-      polesCompleted: number;
       uniqueWorkers: number;
     };
     assemblies: {
@@ -979,7 +978,6 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
   // Key metrics in a grid
   const summaryData = [
     ["Field Work", `${summary.fieldWork.totalLogs} logs | ${summary.fieldWork.totalHours.toLocaleString()} hrs | ${summary.fieldWork.totalFootage.toLocaleString()} ft`],
-    ["Poles Completed", String(summary.fieldWork.polesCompleted)],
     ["Unique Workers", String(summary.fieldWork.uniqueWorkers)],
     ["Assemblies Used", `${summary.assemblies.totalUsed} (${summary.assemblies.uniqueTypes} types)`],
     ["Inventory Cost", `$${summary.inventory.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
@@ -1009,14 +1007,27 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
   doc.text("Equipment usage this month", 14, invY);
   invY += 8;
 
-  if (data.inventoryUsage.length > 0) {
-    const inventoryTableData = data.inventoryUsage.slice(0, 18).map((item) => [
+  // Build equipment table data including derived usage
+  const derivedRows = (data.derivedUsage ?? [])
+    .filter((d) => d.quantity > 0)
+    .map((item) => [
+      `${item.name} (calculated)`,
+      item.formula || "-",
+      item.quantity.toLocaleString(),
+      "-",
+    ]);
+
+  const inventoryTableData = [
+    ...data.inventoryUsage.slice(0, 18).map((item) => [
       item.equipment.name,
       item.equipment.sku,
       item.totalQuantity.toLocaleString(),
       `$${item.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    ]);
+    ]),
+    ...derivedRows,
+  ];
 
+  if (inventoryTableData.length > 0) {
     autoTable(doc, {
       startY: invY,
       head: [["Equipment", "SKU", "Qty Used", "Cost"]],
@@ -1040,23 +1051,6 @@ export function generateMonthlyReportPDF(data: MonthlyReportData): jsPDF {
   }
 
   invY += 10;
-
-  // Derived usage (from field work)
-  const derivedWithQty = data.derivedUsage?.filter((d) => d.quantity > 0) ?? [];
-  if (derivedWithQty.length > 0) {
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Derived usage (from field work)", 14, invY);
-    invY += 8;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    derivedWithQty.forEach((item) => {
-      const note = item.formula ? ` — ${item.formula}` : "";
-      doc.text(`${item.name}: ${item.quantity.toLocaleString()}${note}`, 14, invY);
-      invY += 6;
-    });
-    invY += 6;
-  }
 
   // Stock level changes
   doc.setFontSize(12);
