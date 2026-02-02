@@ -289,10 +289,10 @@ export default function UsersPage() {
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="team">Team</Label>
-                      <Select value={formData.teamId} onValueChange={(value) => setFormData({ ...formData, teamId: value })}>
+                      <Select value={formData.teamId || "none"} onValueChange={(value) => setFormData({ ...formData, teamId: value === "none" ? "" : value })}>
                         <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="No team assigned" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No team</SelectItem>
+                          <SelectItem value="none">No team</SelectItem>
                           {teams.map((team) => (<SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>))}
                         </SelectContent>
                       </Select>
@@ -441,10 +441,10 @@ export default function UsersPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="editTeam">Team</Label>
-                  <Select value={editFormData.teamId} onValueChange={(value) => setEditFormData({ ...editFormData, teamId: value })}>
+                  <Select value={editFormData.teamId || "none"} onValueChange={(value) => setEditFormData({ ...editFormData, teamId: value === "none" ? "" : value })}>
                     <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="No team assigned" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No team</SelectItem>
+                      <SelectItem value="none">No team</SelectItem>
                       {teams.map((team) => (<SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>))}
                     </SelectContent>
                   </Select>

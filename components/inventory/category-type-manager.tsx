@@ -38,10 +38,28 @@ import {
   RefreshCw,
   ChevronRight,
   Layers,
-  Package,
+  GripVertical,
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CategoryBadge } from "@/components/ui/filter-chips";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface AssemblyCategory {
   id: string;
@@ -69,6 +87,166 @@ interface AssemblyType {
   };
 }
 
+// Sortable Category Item Component
+function SortableCategoryItem({
+  category,
+  isSelected,
+  onSelect,
+  onEdit,
+  onDelete,
+}: {
+  category: AssemblyCategory;
+  isSelected: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center justify-between p-3 rounded-lg border transition-colors",
+        isDragging && "opacity-50 shadow-lg bg-white z-50",
+        isSelected 
+          ? "bg-primary/5 border-primary/30" 
+          : "hover:bg-muted/50"
+      )}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <button
+          className="cursor-grab active:cursor-grabbing touch-none p-1 -ml-1 text-muted-foreground hover:text-foreground"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div 
+          className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+          onClick={onSelect}
+        >
+          <ChevronRight className={cn(
+            "h-4 w-4 text-muted-foreground transition-transform shrink-0",
+            isSelected && "rotate-90"
+          )} />
+          <div className="min-w-0">
+            <p className="font-medium truncate">{category.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {category._count.types} types · {category._count.assemblies} assemblies
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-destructive hover:text-destructive"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Sortable Type Item Component
+function SortableTypeItem({
+  type,
+  onEdit,
+  onDelete,
+}: {
+  type: AssemblyType;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: type.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors",
+        isDragging && "opacity-50 shadow-lg bg-white z-50"
+      )}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <button
+          className="cursor-grab active:cursor-grabbing touch-none p-1 -ml-1 text-muted-foreground hover:text-foreground"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-medium truncate">{type.name}</p>
+            <CategoryBadge category={type.category.name} className="shrink-0" />
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {type._count.assemblies} assemblies
+            {type.description && ` · ${type.description}`}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onEdit}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-destructive hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function CategoryTypeManager() {
   const [categories, setCategories] = useState<AssemblyCategory[]>([]);
   const [types, setTypes] = useState<AssemblyType[]>([]);
@@ -91,6 +269,18 @@ export function CategoryTypeManager() {
   // Selected category for filtering types
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const fetchCategories = useCallback(async () => {
     try {
       const res = await fetch("/api/assembly-categories");
@@ -105,10 +295,7 @@ export function CategoryTypeManager() {
 
   const fetchTypes = useCallback(async () => {
     try {
-      const url = selectedCategoryId 
-        ? `/api/assembly-types?categoryId=${selectedCategoryId}`
-        : "/api/assembly-types";
-      const res = await fetch(url);
+      const res = await fetch("/api/assembly-types");
       if (res.ok) {
         const data = await res.json();
         setTypes(data);
@@ -116,7 +303,7 @@ export function CategoryTypeManager() {
     } catch (error) {
       console.error("Error fetching types:", error);
     }
-  }, [selectedCategoryId]);
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -126,11 +313,6 @@ export function CategoryTypeManager() {
     };
     init();
   }, [fetchCategories, fetchTypes]);
-
-  // Refresh types when category filter changes
-  useEffect(() => {
-    fetchTypes();
-  }, [selectedCategoryId, fetchTypes]);
 
   // Category CRUD
   const openCreateCategory = () => {
@@ -272,6 +454,66 @@ export function CategoryTypeManager() {
     }
   };
 
+  // Handle category drag end
+  const handleCategoryDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = categories.findIndex((c) => c.id === active.id);
+      const newIndex = categories.findIndex((c) => c.id === over.id);
+
+      const newCategories = arrayMove(categories, oldIndex, newIndex);
+      setCategories(newCategories);
+
+      // Persist the new order
+      try {
+        await fetch("/api/assembly-categories", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: newCategories.map((c, i) => ({ id: c.id, order: i })),
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to save category order:", error);
+        // Revert on error
+        fetchCategories();
+      }
+    }
+  };
+
+  // Handle type drag end
+  const handleTypeDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = filteredTypes.findIndex((t) => t.id === active.id);
+      const newIndex = filteredTypes.findIndex((t) => t.id === over.id);
+
+      const newFilteredTypes = arrayMove(filteredTypes, oldIndex, newIndex);
+      
+      // Update the full types array
+      const otherTypes = types.filter(t => !filteredTypes.some(ft => ft.id === t.id));
+      const newTypes = [...otherTypes, ...newFilteredTypes];
+      setTypes(newTypes);
+
+      // Persist the new order (only for the filtered types)
+      try {
+        await fetch("/api/assembly-types", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: newFilteredTypes.map((t, i) => ({ id: t.id, order: i })),
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to save type order:", error);
+        // Revert on error
+        fetchTypes();
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -289,9 +531,9 @@ export function CategoryTypeManager() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Categories & Types</h3>
+          <h3 className="text-lg font-semibold">Assembly Types</h3>
           <p className="text-sm text-muted-foreground">
-            Organize assemblies into categories and types for easier field selection
+            Manage assembly types. Groups are for visual organization in dropdowns.
           </p>
         </div>
         <div className="flex gap-2">
@@ -303,16 +545,21 @@ export function CategoryTypeManager() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Categories Column */}
+        {/* Groups Column */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
                   <FolderTree className="h-4 w-4" />
-                  Categories
+                  Groups
                 </CardTitle>
-                <CardDescription>{categories.length} categories</CardDescription>
+                <CardDescription>
+                  {categories.length} groups for visual organization
+                  {categories.length > 1 && (
+                    <span className="ml-1">· drag to reorder</span>
+                  )}
+                </CardDescription>
               </div>
               <Button size="sm" onClick={openCreateCategory}>
                 <Plus className="h-4 w-4 mr-1" />
@@ -323,54 +570,34 @@ export function CategoryTypeManager() {
           <CardContent className="space-y-2">
             {categories.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                No categories yet. Create one to get started.
+                No groups yet. Create one to organize types.
               </p>
             ) : (
-              categories.map((category) => (
-                <div
-                  key={category.id}
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer",
-                    selectedCategoryId === category.id 
-                      ? "bg-primary/5 border-primary/30" 
-                      : "hover:bg-muted/50"
-                  )}
-                  onClick={() => setSelectedCategoryId(
-                    selectedCategoryId === category.id ? null : category.id
-                  )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleCategoryDragEnd}
+              >
+                <SortableContext
+                  items={categories.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <ChevronRight className={cn(
-                      "h-4 w-4 text-muted-foreground transition-transform",
-                      selectedCategoryId === category.id && "rotate-90"
-                    )} />
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{category.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {category._count.types} types · {category._count.assemblies} assemblies
-                      </p>
-                    </div>
+                  <div className="space-y-2">
+                    {categories.map((category) => (
+                      <SortableCategoryItem
+                        key={category.id}
+                        category={category}
+                        isSelected={selectedCategoryId === category.id}
+                        onSelect={() => setSelectedCategoryId(
+                          selectedCategoryId === category.id ? null : category.id
+                        )}
+                        onEdit={() => openEditCategory(category)}
+                        onDelete={() => setDeleteTarget({ type: "category", item: category })}
+                      />
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEditCategory(category)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget({ type: "category", item: category })}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
@@ -389,7 +616,12 @@ export function CategoryTypeManager() {
                     </span>
                   )}
                 </CardTitle>
-                <CardDescription>{filteredTypes.length} types</CardDescription>
+                <CardDescription>
+                  {filteredTypes.length} types
+                  {filteredTypes.length > 1 && (
+                    <span className="ml-1">· drag to reorder</span>
+                  )}
+                </CardDescription>
               </div>
               <Button 
                 size="sm" 
@@ -404,62 +636,52 @@ export function CategoryTypeManager() {
           <CardContent className="space-y-2">
             {categories.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
-                Create a category first, then add types.
+                Create a group first, then add types.
               </p>
             ) : filteredTypes.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 {selectedCategoryId 
-                  ? "No types in this category. Add one to get started."
+                  ? "No types in this group. Add one to get started."
                   : "No types yet. Create one to get started."}
               </p>
             ) : (
-              filteredTypes.map((type) => (
-                <div
-                  key={type.id}
-                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleTypeDragEnd}
+              >
+                <SortableContext
+                  items={filteredTypes.map((t) => t.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{type.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {type.category.name} · {type._count.assemblies} assemblies
-                    </p>
+                  <div className="space-y-2">
+                    {filteredTypes.map((type) => (
+                      <SortableTypeItem
+                        key={type.id}
+                        type={type}
+                        onEdit={() => openEditType(type)}
+                        onDelete={() => setDeleteTarget({ type: "type", item: type })}
+                      />
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEditType(type)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget({ type: "type", item: type })}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Category Dialog */}
+      {/* Group Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingCategory ? "Edit Category" : "Create Category"}
+              {editingCategory ? "Edit Group" : "Create Group"}
             </DialogTitle>
             <DialogDescription>
               {editingCategory 
-                ? "Update category details. Changes will cascade to all assemblies."
-                : "Create a new category for organizing assemblies."}
+                ? "Update group details. Groups organize types in dropdowns."
+                : "Create a new group for visual organization of assembly types."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -469,7 +691,7 @@ export function CategoryTypeManager() {
                 id="cat-name"
                 value={categoryForm.name}
                 onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                placeholder="e.g., Fiber, Strand, Underground"
+                placeholder="e.g., Strand, Fiber, Underground"
               />
             </div>
             <div className="grid gap-2">
@@ -481,23 +703,16 @@ export function CategoryTypeManager() {
                 placeholder="Optional description"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="cat-order">Display Order</Label>
-              <Input
-                id="cat-order"
-                type="number"
-                min="0"
-                value={categoryForm.order}
-                onChange={(e) => setCategoryForm({ ...categoryForm, order: parseInt(e.target.value) || 0 })}
-              />
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Tip: Drag groups to reorder them after creation.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
               Cancel
             </Button>
             <Button onClick={saveCategory} disabled={!categoryForm.name.trim()}>
-              {editingCategory ? "Save Changes" : "Create Category"}
+              {editingCategory ? "Save Changes" : "Create Group"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -512,19 +727,19 @@ export function CategoryTypeManager() {
             </DialogTitle>
             <DialogDescription>
               {editingType 
-                ? "Update type details. Changes will cascade to all assemblies."
-                : "Create a new type within a category."}
+                ? "Update type details. This affects all assemblies using this type."
+                : "Create a new assembly type within a group."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="type-cat">Category *</Label>
+              <Label htmlFor="type-cat">Group *</Label>
               <Select
                 value={typeForm.categoryId}
                 onValueChange={(value) => setTypeForm({ ...typeForm, categoryId: value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder="Select a group" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((cat) => (
@@ -553,16 +768,9 @@ export function CategoryTypeManager() {
                 placeholder="Optional description"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="type-order">Display Order</Label>
-              <Input
-                id="type-order"
-                type="number"
-                min="0"
-                value={typeForm.order}
-                onChange={(e) => setTypeForm({ ...typeForm, order: parseInt(e.target.value) || 0 })}
-              />
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Tip: Drag types to reorder them after creation.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTypeDialogOpen(false)}>
@@ -591,11 +799,11 @@ export function CategoryTypeManager() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {deleteTarget?.type === "category" ? "Category" : "Type"}?
+              Delete {deleteTarget?.type === "category" ? "Group" : "Type"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget?.type === "category" 
-                ? `Are you sure you want to delete "${(deleteTarget?.item as AssemblyCategory)?.name}"? This action cannot be undone.`
+                ? `Are you sure you want to delete the group "${(deleteTarget?.item as AssemblyCategory)?.name}"? Types in this group will need to be reassigned.`
                 : `Are you sure you want to delete "${(deleteTarget?.item as AssemblyType)?.name}"? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -67,7 +67,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, description, status, items } = body;
+    const { name, description, status, items, isLegacy } = body;
 
     // Role-based access control for editing assemblies
     // Admin: Full access to all assemblies
@@ -100,6 +100,7 @@ export async function PUT(
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (status !== undefined) updateData.status = status;
+    if (isLegacy !== undefined) updateData.isLegacy = isLegacy;
     if (body.categories !== undefined) updateData.categories = Array.isArray(body.categories) ? body.categories : [];
     if (body.categoryId !== undefined) updateData.categoryId = body.categoryId || null;
     if (body.typeId !== undefined) updateData.typeId = body.typeId || null;
@@ -200,27 +201,57 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check if assembly exists and get related counts
+    const existing = await prisma.assembly.findUnique({
+      where: { id: params.id },
+      include: {
+        _count: {
+          select: {
+            usageLogs: true,
+            jobPlanAssemblies: true,
+          },
+        },
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Assembly not found" }, { status: 404 });
+    }
+
     // Role-based access control for deleting assemblies
     // Admin: Can delete any assembly
     // Manager: Can delete any assembly
     // Field: Can only delete their own drafts
     if (!["ADMIN", "SUPERUSER", "MANAGER"].includes(session.user.role)) {
-      const existing = await prisma.assembly.findUnique({
-        where: { id: params.id },
-      });
-      
-      if (!existing) {
-        return NextResponse.json({ error: "Assembly not found" }, { status: 404 });
-      }
-      
       // Field users can only delete their own drafts
       if (existing.createdById !== session.user.id || existing.status !== "DRAFT") {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     }
 
-    await prisma.assembly.delete({
-      where: { id: params.id },
+    // Check if assembly is used in job plans
+    if (existing._count.jobPlanAssemblies > 0) {
+      return NextResponse.json(
+        { 
+          error: `Cannot delete: This assembly is used in ${existing._count.jobPlanAssemblies} job plan(s). Remove it from those jobs first.` 
+        },
+        { status: 400 }
+      );
+    }
+
+    // Delete related records in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Delete usage logs first
+      if (existing._count.usageLogs > 0) {
+        await tx.assemblyUsageLog.deleteMany({
+          where: { assemblyId: params.id },
+        });
+      }
+
+      // Delete the assembly (items are cascade deleted via schema)
+      await tx.assembly.delete({
+        where: { id: params.id },
+      });
     });
 
     return NextResponse.json({ success: true });
@@ -230,6 +261,12 @@ export async function DELETE(
       return NextResponse.json(
         { error: "Assembly not found" },
         { status: 404 }
+      );
+    }
+    if (error.code === "P2003") {
+      return NextResponse.json(
+        { error: "Cannot delete: Assembly has related records" },
+        { status: 400 }
       );
     }
     return NextResponse.json(

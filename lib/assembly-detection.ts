@@ -51,25 +51,38 @@ const ENDPOINT_THRESHOLD_METERS = 15;
 // ASSEMBLY TYPES
 // ============================================================================
 
-// Assembly types that map to infrastructure
-export type AssemblyType = 
-  | "Terminal Pole"      // Dead end - 1 connection
-  | "Tangent Pole"       // Straight pass-through - 2 connections, ~180°
-  | "Corner Pole"        // Angle change - 2 connections, sharp angle
-  | "Junction Pole"      // Branch point - 3+ connections
-  | "Intermediate Pole"  // Legacy: kept for backward compatibility
-  | "Splice Case"
-  | "MST"                // Generic MST (unknown port count)
-  | "MST 2-Port"         // 2-port MST
-  | "MST 6-Port"         // 6-port MST
-  | "Riser"
-  | "Vault"
-  | "Handhole"
-  | "Pedestal"
-  | "Guy/Anchor"
-  | "Crossing"
-  | "Slack Loop"
-  | "Unknown";
+// Assembly type slugs - machine-readable identifiers that match database slugs
+export type AssemblyTypeSlug = 
+  // Strand Group - Pole attachments for strand
+  | "strand.terminal"      // Dead end - 1 connection
+  | "strand.tangent"       // Straight pass-through - 2 connections, ~180°
+  | "strand.corner"        // Angle change - 2 connections, sharp angle
+  | "strand.junction"      // Branch point - 3+ connections
+  // Fiber Group - Fiber pole attachments
+  | "fiber.terminal"       // Dead end fiber attachment with slack storage
+  | "fiber.tangent"        // Pass-through fiber attachment (P-clamps, snowshoes)
+  | "fiber.corner"         // Angle fiber attachment with additional hardware
+  | "fiber.junction"       // Multi-direction fiber attachment
+  | "fiber.splice"         // Splice case
+  | "fiber.slack"          // Slack loop
+  // Underground Group
+  | "underground.vault"
+  | "underground.handhole"
+  | "underground.riser"
+  // Service Group
+  | "service.mst"          // Generic MST (unknown port count)
+  | "service.mst2"         // 2-port MST
+  | "service.mst6"         // 6-port MST
+  | "service.mst8"         // 8-port MST
+  | "service.pedestal"
+  // Hardware Group
+  | "hardware.anchor"      // Guy/Anchor
+  | "hardware.crossing"
+  // Special
+  | "unknown";
+
+// Alias for backward compatibility
+export type AssemblyType = AssemblyTypeSlug;
 
 // Detected assembly for a feature
 export interface DetectedAssembly {
@@ -115,11 +128,11 @@ export interface InfrastructureFeature {
 // ============================================================================
 
 /**
- * Map pole type values from shapefile to AssemblyType.
+ * Map pole type values from shapefile to AssemblyType slug.
  * Returns null if the type is unknown or should fall back to auto-detection.
  * 
  * @param shapefileType - The Pole_Type value from the shapefile
- * @returns Mapped AssemblyType or null if unknown
+ * @returns Mapped AssemblyType slug or null if unknown
  */
 export function mapShapefilePoleType(shapefileType: string): AssemblyType | null {
   if (!shapefileType) return null;
@@ -134,7 +147,7 @@ export function mapShapefilePoleType(shapefileType: string): AssemblyType | null
     normalized === "te" ||
     normalized === "term"
   ) {
-    return "Terminal Pole";
+    return "strand.terminal";
   }
   
   // Tangent pole variations
@@ -146,7 +159,7 @@ export function mapShapefilePoleType(shapefileType: string): AssemblyType | null
     normalized === "ta" ||
     normalized === "tang"
   ) {
-    return "Tangent Pole";
+    return "strand.tangent";
   }
   
   // Corner pole variations
@@ -157,7 +170,7 @@ export function mapShapefilePoleType(shapefileType: string): AssemblyType | null
     normalized === "co" ||
     normalized === "corn"
   ) {
-    return "Corner Pole";
+    return "strand.corner";
   }
   
   // Junction pole variations
@@ -172,7 +185,7 @@ export function mapShapefilePoleType(shapefileType: string): AssemblyType | null
     normalized === "ju" ||
     normalized === "junc"
   ) {
-    return "Junction Pole";
+    return "strand.junction";
   }
   
   // Riser variations
@@ -180,7 +193,7 @@ export function mapShapefilePoleType(shapefileType: string): AssemblyType | null
     normalized.includes("riser") ||
     normalized === "ri"
   ) {
-    return "Riser";
+    return "underground.riser";
   }
   
   // Unknown type - fall back to auto-detection
@@ -718,7 +731,7 @@ export function detectPoleType(
   // Handle missing location
   if (!pole.location?.coordinates) {
     return { 
-      type: "Intermediate Pole", 
+      type: "strand.tangent", 
       confidence: "low",
       connectionCount: 0,
     };
@@ -728,10 +741,10 @@ export function detectPoleType(
   if (pole.poleType) {
     const mappedType = mapShapefilePoleType(pole.poleType);
     if (mappedType && (
-      mappedType === "Terminal Pole" ||
-      mappedType === "Tangent Pole" ||
-      mappedType === "Corner Pole" ||
-      mappedType === "Junction Pole"
+      mappedType === "strand.terminal" ||
+      mappedType === "strand.tangent" ||
+      mappedType === "strand.corner" ||
+      mappedType === "strand.junction"
     )) {
       return {
         type: mappedType,
@@ -763,7 +776,7 @@ export function detectPoleType(
     // Fall back to legacy endpoint check for backward compatibility
     if (isNearEndpoint(coords, endpoints)) {
       return { 
-        type: "Terminal Pole", 
+        type: "strand.terminal", 
         confidence: "medium",
         connectionCount: 0,
         connections: [],
@@ -771,7 +784,7 @@ export function detectPoleType(
     }
     // No connections found at all - likely a data gap, default to low confidence
     return { 
-      type: "Intermediate Pole", 
+      type: "strand.tangent", 
       confidence: "low",
       connectionCount: 0,
       connections: [],
@@ -783,7 +796,7 @@ export function detectPoleType(
     // High confidence terminal if the connection is at a true segment endpoint
     const confidence = atEndpoint > 0 ? "high" : "medium";
     return { 
-      type: "Terminal Pole", 
+      type: "strand.terminal", 
       confidence,
       connectionCount: 1,
       connections,
@@ -798,7 +811,7 @@ export function detectPoleType(
     
     if (isTangentAngle(angle, TANGENT_ANGLE_TOLERANCE)) {
       return { 
-        type: "Tangent Pole", 
+        type: "strand.tangent", 
         confidence: "high",
         connectionCount: 2,
         interiorAngle: angle,
@@ -806,7 +819,7 @@ export function detectPoleType(
       };
     } else {
       return { 
-        type: "Corner Pole", 
+        type: "strand.corner", 
         confidence: "high",
         connectionCount: 2,
         interiorAngle: angle,
@@ -818,7 +831,7 @@ export function detectPoleType(
   // Degree 3+: Junction / T-Pole / Intersection
   // These are where multiple fiber routes meet, branch, or cross
   return { 
-    type: "Junction Pole", 
+    type: "strand.junction", 
     confidence: "high",
     connectionCount: degree,
     connections,
@@ -826,43 +839,46 @@ export function detectPoleType(
 }
 
 /**
- * Map infrastructure type to assembly type
+ * Map infrastructure type to assembly type slug
  */
 function mapInfraToAssemblyType(itemType: string, specs?: string): AssemblyType {
   switch (itemType.toLowerCase()) {
     case "pole":
-      return "Intermediate Pole"; // Will be refined by detectPoleType
+      return "strand.tangent"; // Will be refined by detectPoleType
     case "splice":
-      return "Splice Case";
+      return "fiber.splice";
     case "mst":
       // Differentiate MST by port count from specs
       if (specs) {
         const specsLower = specs.toLowerCase();
         if (specsLower.includes("2-port") || specsLower.includes("2 port")) {
-          return "MST 2-Port";
+          return "service.mst2";
         }
         if (specsLower.includes("6-port") || specsLower.includes("6 port")) {
-          return "MST 6-Port";
+          return "service.mst6";
+        }
+        if (specsLower.includes("8-port") || specsLower.includes("8 port")) {
+          return "service.mst8";
         }
       }
-      return "MST"; // Generic MST if port count unknown
+      return "service.mst"; // Generic MST if port count unknown
     case "riser":
-      return "Riser";
+      return "underground.riser";
     case "vault":
-      return "Vault";
+      return "underground.vault";
     case "handhole":
-      return "Handhole";
+      return "underground.handhole";
     case "pedestal":
-      return "Pedestal";
+      return "service.pedestal";
     case "guy":
     case "anchor":
-      return "Guy/Anchor";
+      return "hardware.anchor";
     case "crossing":
-      return "Crossing";
+      return "hardware.crossing";
     case "slack_loop":
-      return "Slack Loop";
+      return "fiber.slack";
     default:
-      return "Unknown";
+      return "unknown";
   }
 }
 
@@ -919,29 +935,39 @@ export function detectAssemblyTypes(
 }
 
 /**
- * Get summary counts by assembly type
+ * Get summary counts by assembly type slug
  */
 export function getAssemblyTypeCounts(
   detections: DetectedAssembly[]
 ): Record<AssemblyType, number> {
   const counts: Record<AssemblyType, number> = {
-    "Terminal Pole": 0,
-    "Tangent Pole": 0,
-    "Corner Pole": 0,
-    "Junction Pole": 0,
-    "Intermediate Pole": 0,
-    "Splice Case": 0,
-    "MST": 0,
-    "MST 2-Port": 0,
-    "MST 6-Port": 0,
-    "Riser": 0,
-    "Vault": 0,
-    "Handhole": 0,
-    "Pedestal": 0,
-    "Guy/Anchor": 0,
-    "Crossing": 0,
-    "Slack Loop": 0,
-    "Unknown": 0,
+    // Strand
+    "strand.terminal": 0,
+    "strand.tangent": 0,
+    "strand.corner": 0,
+    "strand.junction": 0,
+    // Fiber
+    "fiber.terminal": 0,
+    "fiber.tangent": 0,
+    "fiber.corner": 0,
+    "fiber.junction": 0,
+    "fiber.splice": 0,
+    "fiber.slack": 0,
+    // Underground
+    "underground.vault": 0,
+    "underground.handhole": 0,
+    "underground.riser": 0,
+    // Service
+    "service.mst": 0,
+    "service.mst2": 0,
+    "service.mst6": 0,
+    "service.mst8": 0,
+    "service.pedestal": 0,
+    // Hardware
+    "hardware.anchor": 0,
+    "hardware.crossing": 0,
+    // Special
+    "unknown": 0,
   };
   
   for (const detection of detections) {

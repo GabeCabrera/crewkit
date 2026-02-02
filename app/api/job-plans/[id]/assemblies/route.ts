@@ -195,6 +195,73 @@ export async function POST(
           }
         }
 
+        // If still no match, try prefixed type match (e.g., "MST 6-Port" matches "Service: MST 6-Port")
+        if (!targetAssemblyId) {
+          const prefixedTypeMatch = await prisma.assemblyType.findFirst({
+            where: {
+              name: {
+                endsWith: assemblyType,
+                mode: "insensitive",
+              },
+            },
+            select: { id: true },
+          });
+
+          if (prefixedTypeMatch) {
+            const matchingAssembly = await prisma.assembly.findFirst({
+              where: {
+                typeId: prefixedTypeMatch.id,
+                status: "APPROVED",
+              },
+              select: { id: true },
+            });
+
+            if (matchingAssembly) {
+              targetAssemblyId = matchingAssembly.id;
+            } else {
+              const anyAssembly = await prisma.assembly.findFirst({
+                where: { typeId: prefixedTypeMatch.id },
+                select: { id: true },
+              });
+              if (anyAssembly) {
+                targetAssemblyId = anyAssembly.id;
+              }
+            }
+          }
+        }
+
+        // If still no match, try partial match by assembly name containing the type
+        if (!targetAssemblyId) {
+          const assemblyByName = await prisma.assembly.findFirst({
+            where: {
+              name: {
+                contains: assemblyType,
+                mode: "insensitive",
+              },
+              status: "APPROVED",
+            },
+            select: { id: true },
+          });
+
+          if (assemblyByName) {
+            targetAssemblyId = assemblyByName.id;
+          } else {
+            // Try any non-approved assembly with partial match
+            const anyAssemblyByName = await prisma.assembly.findFirst({
+              where: {
+                name: {
+                  contains: assemblyType,
+                  mode: "insensitive",
+                },
+              },
+              select: { id: true },
+            });
+            if (anyAssemblyByName) {
+              targetAssemblyId = anyAssemblyByName.id;
+            }
+          }
+        }
+
         // If still no match, try exact match by assembly name
         if (!targetAssemblyId) {
           const assemblyByName = await prisma.assembly.findFirst({

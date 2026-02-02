@@ -204,7 +204,7 @@ export function EquipmentCombobox({
               <span>Loading equipment...</span>
             </div>
           ) : selectedEquipment ? (
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               {selectedEquipment.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img 
@@ -217,7 +217,9 @@ export function EquipmentCombobox({
                   <Package className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
               )}
-              <span className="truncate font-medium text-foreground">{selectedEquipment.name}</span>
+              <span className="truncate font-medium text-foreground min-w-0" title={selectedEquipment.name}>
+                {selectedEquipment.name}
+              </span>
               <span className={cn(
                 "text-xs shrink-0 px-1.5 py-0.5 rounded",
                 getStockStatus(selectedEquipment.inventory?.quantity || 0).bgColor,
@@ -338,20 +340,13 @@ export function EquipmentCombobox({
                         className={cn(
                           "cursor-pointer rounded-md mx-1 py-2",
                           "transition-colors",
-                          "aria-selected:bg-accent",
-                          isOutOfStock && "opacity-60"
+                          "aria-selected:bg-accent"
                         )}
-                        disabled={isOutOfStock}
                       >
                         <EquipmentItem 
                           eq={eq} 
                           isSelected={value === eq.id}
                         />
-                        {isOutOfStock && (
-                          <span className="ml-2 text-xs text-red-500 flex items-center gap-1">
-                            <AlertTriangle className="h-3 w-3" />
-                          </span>
-                        )}
                       </CommandItem>
                     )
                   })}

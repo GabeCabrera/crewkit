@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { syncFieldLogToJobPlan, syncFieldLogCompletions } from "@/lib/field-job-sync";
 
 export const dynamic = 'force-dynamic';
 
@@ -153,6 +154,9 @@ export async function GET(request: NextRequest) {
         createdBy: {
           select: { id: true, name: true, email: true },
         },
+        jobPlan: {
+          select: { id: true, jobName: true, jobNumber: true, locationName: true, status: true },
+        },
       },
     });
 
@@ -227,6 +231,10 @@ export async function POST(request: NextRequest) {
     const date = body.date ? new Date(body.date) : new Date();
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
+    // Extract visual progress completion IDs
+    const completedInfraIds: string[] = body.completedInfraIds || [];
+    const completedFiberIds: string[] = body.completedFiberIds || [];
+
     const log = await prisma.fieldWorkLog.create({
       data: {
         date: dateOnly,
@@ -236,6 +244,11 @@ export async function POST(request: NextRequest) {
         hoursWorked: body.hoursWorked || 0,
         teamId: body.teamId || user.teamId,
         createdById: session.user.id,
+        // Job Plan link (optional)
+        jobPlanId: body.jobPlanId || null,
+        // Visual progress tracking
+        completedInfraIds: completedInfraIds,
+        completedFiberIds: completedFiberIds,
         // Aerial metrics
         strandHungFootage: body.strandHungFootage || null,
         polesAttached: body.polesAttached || null,
@@ -269,8 +282,33 @@ export async function POST(request: NextRequest) {
         createdBy: {
           select: { id: true, name: true, email: true },
         },
+        jobPlan: {
+          select: { id: true, jobName: true, jobNumber: true, locationName: true, status: true },
+        },
       },
     });
+
+    // Sync to job plan if linked
+    if (log.jobPlanId) {
+      try {
+        // Sync metrics to job logs
+        await syncFieldLogToJobPlan(log.id, session.user.id);
+        
+        // Sync visual progress completions if any
+        if (completedInfraIds.length > 0 || completedFiberIds.length > 0) {
+          await syncFieldLogCompletions(
+            log.id,
+            log.jobPlanId,
+            completedInfraIds,
+            completedFiberIds,
+            session.user.id
+          );
+        }
+      } catch (syncError) {
+        console.error("Error syncing field log to job plan:", syncError);
+        // Don't fail the request, just log the error
+      }
+    }
 
     return NextResponse.json(log);
   } catch (error) {

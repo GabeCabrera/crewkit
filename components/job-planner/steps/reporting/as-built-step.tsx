@@ -1,8 +1,28 @@
 "use client";
 
-import { GitCompare, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
+import { GitCompare, CheckCircle2, XCircle, AlertTriangle, FileText, X, Map, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
+import { ReportExportButton } from "./report-export-button";
+import { ReportDownloadBar } from "../../report-download-bar";
+import { JobSheet } from "../planning/job-sheet";
+import type { JobReportData } from "@/lib/report-export";
+
+// Dynamically import ProgressMap to avoid SSR issues with Mapbox
+const ProgressMap = dynamic(
+  () => import("@/components/job-planner/progress-map").then((mod) => mod.ProgressMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-[400px] bg-slate-100 rounded-lg">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    ),
+  }
+);
 
 interface AsBuiltStepProps {
   job: JobPlanData;
@@ -11,6 +31,36 @@ interface AsBuiltStepProps {
 }
 
 export function AsBuiltStep({ job }: AsBuiltStepProps) {
+  const [showJobSheet, setShowJobSheet] = useState(false);
+  const [showProgressMap, setShowProgressMap] = useState(false);
+  // Convert JobPlanData to JobReportData for export
+  const reportData: JobReportData = {
+    id: job.id,
+    jobName: job.jobName,
+    jobNumber: job.jobNumber,
+    locationName: job.locationName,
+    locationAddress: job.locationAddress,
+    status: job.status,
+    totalDistance: job.totalDistance,
+    strandFootage: job.strandFootage,
+    fiberFootage: job.fiberFootage,
+    deadEnds: job.deadEnds,
+    tangents: job.tangents,
+    anchors: job.anchors,
+    poleCount: job.poleCount,
+    actualFootage: job.actualFootage,
+    actualPolesComplete: job.actualPolesComplete,
+    actualStrandUsed: job.actualStrandUsed,
+    actualFiberUsed: job.actualFiberUsed,
+    actualDeadEnds: job.actualDeadEnds,
+    actualTangents: job.actualTangents,
+    actualAnchors: job.actualAnchors,
+    totalCrewHours: job.totalCrewHours,
+    foremanSignoff: job.foremanSignoff,
+    signoffDate: job.signoffDate,
+    lessonsLearned: job.lessonsLearned,
+    completedAt: job.completedAt,
+  };
   // Calculate status for each item
   const getStatus = (planned: number, actual: number, tolerance = 0.1) => {
     if (planned === 0 && actual === 0) return "match";
@@ -90,18 +140,53 @@ export function AsBuiltStep({ job }: AsBuiltStepProps) {
   const overCount = items.filter((i) => i.status === "over").length;
   const underCount = items.filter((i) => i.status === "under").length;
 
+  // If showing job sheet, render that instead
+  if (showJobSheet) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-slate-900">As-Built Job Sheet</h3>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowJobSheet(false)}
+            className="gap-2"
+          >
+            <X className="h-4 w-4" />
+            Close
+          </Button>
+        </div>
+        <JobSheet job={job} mode="as-built" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-        <div className="h-10 w-10 rounded-xl bg-purple-50 flex items-center justify-center">
-          <GitCompare className="h-5 w-5 text-purple-600" />
+      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-purple-50 flex items-center justify-center">
+            <GitCompare className="h-5 w-5 text-purple-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">As-Built Documentation</h3>
+            <p className="text-sm text-slate-500">
+              Comparison of planned vs actual construction
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">As-Built Documentation</h3>
-          <p className="text-sm text-slate-500">
-            Comparison of planned vs actual construction
-          </p>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowJobSheet(true)}
+            className="gap-2"
+          >
+            <FileText className="h-4 w-4" />
+            Job Sheet
+          </Button>
+          <ReportExportButton job={reportData} reportType="as-built" />
         </div>
       </div>
 
@@ -163,6 +248,39 @@ export function AsBuiltStep({ job }: AsBuiltStepProps) {
         </div>
       </div>
 
+      {/* Visual Progress Map */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowProgressMap(!showProgressMap)}
+          className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <Map className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="text-left">
+              <h4 className="text-sm font-medium text-slate-700">Visual Progress Map</h4>
+              <p className="text-xs text-slate-500">View completed infrastructure on the route map</p>
+            </div>
+          </div>
+          {showProgressMap ? (
+            <ChevronUp className="h-5 w-5 text-slate-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-slate-400" />
+          )}
+        </button>
+        {showProgressMap && (
+          <div className="border-t border-slate-200">
+            <ProgressMap
+              jobId={job.id}
+              mode="view"
+              height="450px"
+            />
+          </div>
+        )}
+      </div>
+
       {/* Route Info */}
       <div className="bg-slate-50 rounded-xl p-4">
         <h4 className="text-sm font-medium text-slate-700 mb-3">Route Information</h4>
@@ -191,6 +309,9 @@ export function AsBuiltStep({ job }: AsBuiltStepProps) {
         Items are considered &quot;As Planned&quot; if within 10% tolerance for footage 
         and 20% for hardware counts.
       </p>
+
+      {/* Download All Reports */}
+      <ReportDownloadBar job={job} variant="full" className="mt-6" />
     </div>
   );
 }

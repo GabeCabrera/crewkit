@@ -597,6 +597,10 @@ export function DesignMap({
     zoom: zoom,
   });
   
+  // Ref to track live view state during map movement (no re-renders)
+  const viewStateRef = useRef(viewState);
+  const isMovingRef = useRef(false);
+  
   // Close tooltip state for lasso selection
   const [closeTooltip, setCloseTooltip] = useState<{
     visible: boolean;
@@ -634,6 +638,35 @@ export function DesignMap({
   
   // Debounce timer for hover preview
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Ref to track context menu pinned state (avoids callback recreation)
+  const contextMenuPinnedRef = useRef(false);
+  
+  // Track if map listeners are attached (for cleanup)
+  const listenersAttachedRef = useRef(false);
+  
+  // Store event handler refs for cleanup
+  const eventHandlersRef = useRef<{
+    drawCreate: ((e: any) => void) | null;
+    drawSelectionChange: ((e: any) => void) | null;
+    drawMouseMove: ((e: any) => void) | null;
+    drawPreview: ((e: any) => void) | null;
+    drawModeChange: (() => void) | null;
+  }>({
+    drawCreate: null,
+    drawSelectionChange: null,
+    drawMouseMove: null,
+    drawPreview: null,
+    drawModeChange: null,
+  });
+  
+  // RAF throttle ref for draw preview calculations
+  const previewRAFRef = useRef<number | null>(null);
+  const pendingPreviewPolygonRef = useRef<any>(null);
+  
+  // Track previous bounds to prevent unnecessary fitBounds calls
+  const prevBoundsRef = useRef<[[number, number], [number, number]] | null>(null);
+  const initialBoundsFitRef = useRef(false);
 
   // Memoize GeoJSON data
   const fiberGeoJSON = useMemo(() => createFiberGeoJSON(fiberSegments), [fiberSegments]);
@@ -666,6 +699,11 @@ export function DesignMap({
   useEffect(() => {
     setPreviewFeatureIdsRef.current = setPreviewFeatureIds;
   }, [setPreviewFeatureIds]);
+  
+  // Keep context menu pinned ref in sync (avoids callback recreation in handleMouseMove)
+  useEffect(() => {
+    contextMenuPinnedRef.current = contextMenu?.pinned ?? false;
+  }, [contextMenu?.pinned]);
 
   // ResizeObserver to handle container size changes (e.g., sidebar collapse)
   // This ensures the Mapbox canvas redraws smoothly during CSS transitions
@@ -686,7 +724,7 @@ export function DesignMap({
     };
   }, []);
 
-  // Calculate bounds from all features
+  // Calculate bounds from all features - only fit on initial load or significant data change
   useEffect(() => {
     if (!center && mapRef.current) {
       const allCoords: [number, number][] = [];
@@ -710,12 +748,25 @@ export function DesignMap({
       if (allCoords.length > 0) {
         const lngs = allCoords.map((c) => c[0]);
         const lats = allCoords.map((c) => c[1]);
-        const bounds: [[number, number], [number, number]] = [
+        const newBounds: [[number, number], [number, number]] = [
           [Math.min(...lngs), Math.min(...lats)],
           [Math.max(...lngs), Math.max(...lats)],
         ];
 
-        mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 16 });
+        // Check if bounds have changed significantly (more than 0.001 degrees ~ 100m)
+        const prevBounds = prevBoundsRef.current;
+        const boundsChanged = !prevBounds || 
+          Math.abs(newBounds[0][0] - prevBounds[0][0]) > 0.001 ||
+          Math.abs(newBounds[0][1] - prevBounds[0][1]) > 0.001 ||
+          Math.abs(newBounds[1][0] - prevBounds[1][0]) > 0.001 ||
+          Math.abs(newBounds[1][1] - prevBounds[1][1]) > 0.001;
+        
+        // Only fit bounds on initial load or if bounds changed significantly
+        if (!initialBoundsFitRef.current || boundsChanged) {
+          prevBoundsRef.current = newBounds;
+          initialBoundsFitRef.current = true;
+          mapRef.current.fitBounds(newBounds, { padding: 50, maxZoom: 16 });
+        }
       }
     }
   }, [fiberSegments, infrastructure, center]);
@@ -733,6 +784,19 @@ export function DesignMap({
   const handleMapLoad = useCallback(() => {
     if (mapRef.current) {
       const map = mapRef.current.getMap();
+      
+      // Force resize after load so WebGL canvas paints (fixes blank map until DevTools/resize)
+      requestAnimationFrame(() => {
+        if (mapRef.current) mapRef.current.resize();
+      });
+      
+      // Prevent duplicate listener attachment
+      if (listenersAttachedRef.current) {
+        if (onMapLoad) {
+          onMapLoad(map);
+        }
+        return;
+      }
       
       // Initialize MapboxDraw with custom lasso mode and styles
       const draw = new MapboxDraw({
@@ -754,8 +818,8 @@ export function DesignMap({
       map.addControl(draw as any);
       drawRef.current = draw;
       
-      // Handle draw completion - use refs to avoid stale closures
-      map.on("draw.create", (e: any) => {
+      // Define event handlers and store refs for cleanup
+      const handleDrawCreate = (e: any) => {
         const callback = onSelectionCompleteRef.current;
         const features = allFeaturesRef.current;
         
@@ -775,10 +839,9 @@ export function DesignMap({
           // Clear the drawn shape after selection
           draw.deleteAll();
         }
-      });
+      };
 
-      // Also handle selection change (for first-vertex closing)
-      map.on("draw.selectionchange", (e: any) => {
+      const handleDrawSelectionChange = (e: any) => {
         const callback = onSelectionCompleteRef.current;
         const features = allFeaturesRef.current;
         
@@ -801,10 +864,9 @@ export function DesignMap({
             draw.deleteAll();
           }
         }
-      });
+      };
       
-      // Track mouse movement for close tooltip
-      map.on("mousemove", (e: any) => {
+      const handleDrawMouseMove = (e: any) => {
         // Check if we're in draw mode and near first vertex
         if (drawRef.current) {
           const mode = drawRef.current.getMode();
@@ -815,35 +877,100 @@ export function DesignMap({
             // The actual hover detection is in the LoopSelectMode
           }
         }
-      });
+      };
       
-      // Listen for real-time lasso preview events
-      map.on("draw.preview", (e: any) => {
-        const setPreview = setPreviewFeatureIdsRef.current;
-        const features = allFeaturesRef.current;
+      const handleDrawPreview = (e: any) => {
+        // Store the latest polygon for RAF processing
+        pendingPreviewPolygonRef.current = e.polygon;
         
-        if (e.polygon && setPreview) {
-          // Calculate features inside the current polygon
-          const previewIds = getIntersectingFeatureIds(e.polygon, features);
-          const allPreviewIds = new Set([
-            ...previewIds.fiberIds,
-            ...previewIds.infraIds,
-            ...previewIds.conduitIds,
-          ]);
-          setPreview(allPreviewIds);
+        // Skip if RAF already scheduled - will use latest polygon
+        if (previewRAFRef.current !== null) {
+          return;
         }
-      });
+        
+        // Schedule calculation for next frame (throttle to ~60fps)
+        previewRAFRef.current = requestAnimationFrame(() => {
+          previewRAFRef.current = null;
+          
+          const polygon = pendingPreviewPolygonRef.current;
+          const setPreview = setPreviewFeatureIdsRef.current;
+          const features = allFeaturesRef.current;
+          
+          if (polygon && setPreview) {
+            // Calculate features inside the current polygon
+            const previewIds = getIntersectingFeatureIds(polygon, features);
+            const allPreviewIds = new Set([
+              ...previewIds.fiberIds,
+              ...previewIds.infraIds,
+              ...previewIds.conduitIds,
+            ]);
+            setPreview(allPreviewIds);
+          }
+        });
+      };
       
-      // Clear preview when drawing ends or is cancelled
-      map.on("draw.modechange", () => {
+      const handleDrawModeChange = () => {
         setPreviewFeatureIdsRef.current?.(new Set());
-      });
+      };
+      
+      // Store handler refs for cleanup
+      eventHandlersRef.current = {
+        drawCreate: handleDrawCreate,
+        drawSelectionChange: handleDrawSelectionChange,
+        drawMouseMove: handleDrawMouseMove,
+        drawPreview: handleDrawPreview,
+        drawModeChange: handleDrawModeChange,
+      };
+      
+      // Attach event listeners
+      map.on("draw.create", handleDrawCreate);
+      map.on("draw.selectionchange", handleDrawSelectionChange);
+      map.on("mousemove", handleDrawMouseMove);
+      map.on("draw.preview", handleDrawPreview);
+      map.on("draw.modechange", handleDrawModeChange);
+      
+      listenersAttachedRef.current = true;
       
       if (onMapLoad) {
         onMapLoad(map);
       }
     }
   }, [onMapLoad, triggerSelectionFlash]); // Removed allFeatures and onSelectionComplete - using refs instead
+  
+  // Cleanup event listeners and draw control on unmount
+  useEffect(() => {
+    return () => {
+      if (mapRef.current && listenersAttachedRef.current) {
+        const map = mapRef.current.getMap();
+        const handlers = eventHandlersRef.current;
+        
+        // Remove event listeners
+        if (handlers.drawCreate) map.off("draw.create", handlers.drawCreate);
+        if (handlers.drawSelectionChange) map.off("draw.selectionchange", handlers.drawSelectionChange);
+        if (handlers.drawMouseMove) map.off("mousemove", handlers.drawMouseMove);
+        if (handlers.drawPreview) map.off("draw.preview", handlers.drawPreview);
+        if (handlers.drawModeChange) map.off("draw.modechange", handlers.drawModeChange);
+        
+        // Remove draw control
+        if (drawRef.current) {
+          try {
+            map.removeControl(drawRef.current as any);
+          } catch (e) {
+            // Control may already be removed
+          }
+          drawRef.current = null;
+        }
+        
+        listenersAttachedRef.current = false;
+      }
+      
+      // Cancel any pending RAF
+      if (previewRAFRef.current !== null) {
+        cancelAnimationFrame(previewRAFRef.current);
+        previewRAFRef.current = null;
+      }
+    };
+  }, []);
   
   // ESC key to cancel drawing
   useEffect(() => {
@@ -990,8 +1117,8 @@ export function DesignMap({
   // Handle mouse move for hover preview
   const handleMouseMove = useCallback(
     (e: MapMouseEvent) => {
-      // Skip if in select mode or menu is pinned
-      if (selectMode || contextMenu?.pinned) return;
+      // Skip if in select mode or menu is pinned (use ref to avoid callback recreation)
+      if (selectMode || contextMenuPinnedRef.current) return;
 
       // Clear any pending hover timeout
       if (hoverTimeoutRef.current) {
@@ -1028,7 +1155,7 @@ export function DesignMap({
         });
       }, 150);
     },
-    [selectMode, contextMenu?.pinned, buildContextMenuFeatures]
+    [selectMode, buildContextMenuFeatures] // Removed contextMenu?.pinned - using ref instead
   );
 
   // Cleanup hover timeout on unmount
@@ -1565,7 +1692,19 @@ export function DesignMap({
         ref={mapRef}
         {...viewState}
         cursor={selectMode ? "crosshair" : undefined}
-        onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
+        onMoveStart={() => { isMovingRef.current = true; }}
+        onMove={(evt: ViewStateChangeEvent) => {
+          // Update ref only during movement (no re-render)
+          viewStateRef.current = evt.viewState;
+          // Still need to update state for controlled mode, but React will batch
+          setViewState(evt.viewState);
+        }}
+        onMoveEnd={(evt: ViewStateChangeEvent) => {
+          isMovingRef.current = false;
+          // Ensure final state is synced
+          viewStateRef.current = evt.viewState;
+          setViewState(evt.viewState);
+        }}
         onLoad={handleMapLoad}
         onClick={handleClick}
         onMouseMove={handleMouseMove}

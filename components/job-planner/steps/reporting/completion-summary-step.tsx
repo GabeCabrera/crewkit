@@ -1,8 +1,35 @@
 "use client";
 
-import { FileText, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FileText, TrendingUp, TrendingDown, Minus, ClipboardList, ExternalLink, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
+import { ReportExportButton } from "./report-export-button";
+import type { JobReportData } from "@/lib/report-export";
+
+interface FieldLogSummary {
+  count: number;
+  totalHours: number;
+  totalFootage: number;
+  totalPoles: number;
+  dates: string[];
+}
+
+interface FieldLog {
+  id: string;
+  date: string;
+  location: string;
+  workersNames: string[];
+  workerCount: number;
+  hoursWorked: number;
+  strandHungFootage: number | null;
+  fiberLashedFootage: number | null;
+  fiberPulledFootage: number | null;
+  polesAttached: number | null;
+  notes: string | null;
+  syncedAt: string | null;
+  submittedBy: string;
+}
 
 interface CompletionSummaryStepProps {
   job: JobPlanData;
@@ -11,6 +38,56 @@ interface CompletionSummaryStepProps {
 }
 
 export function CompletionSummaryStep({ job }: CompletionSummaryStepProps) {
+  const [fieldLogs, setFieldLogs] = useState<FieldLog[]>([]);
+  const [fieldLogSummary, setFieldLogSummary] = useState<FieldLogSummary | null>(null);
+  const [loadingFieldLogs, setLoadingFieldLogs] = useState(true);
+
+  // Fetch linked field logs
+  useEffect(() => {
+    const fetchFieldLogs = async () => {
+      try {
+        const response = await fetch(`/api/job-plans/${job.id}/field-logs`);
+        if (response.ok) {
+          const data = await response.json();
+          setFieldLogs(data.logs || []);
+          setFieldLogSummary(data.summary || null);
+        }
+      } catch (error) {
+        console.error("Error fetching field logs:", error);
+      } finally {
+        setLoadingFieldLogs(false);
+      }
+    };
+    fetchFieldLogs();
+  }, [job.id]);
+  // Convert JobPlanData to JobReportData for export
+  const reportData: JobReportData = {
+    id: job.id,
+    jobName: job.jobName,
+    jobNumber: job.jobNumber,
+    locationName: job.locationName,
+    locationAddress: job.locationAddress,
+    status: job.status,
+    totalDistance: job.totalDistance,
+    strandFootage: job.strandFootage,
+    fiberFootage: job.fiberFootage,
+    deadEnds: job.deadEnds,
+    tangents: job.tangents,
+    anchors: job.anchors,
+    poleCount: job.poleCount,
+    actualFootage: job.actualFootage,
+    actualPolesComplete: job.actualPolesComplete,
+    actualStrandUsed: job.actualStrandUsed,
+    actualFiberUsed: job.actualFiberUsed,
+    actualDeadEnds: job.actualDeadEnds,
+    actualTangents: job.actualTangents,
+    actualAnchors: job.actualAnchors,
+    totalCrewHours: job.totalCrewHours,
+    foremanSignoff: job.foremanSignoff,
+    signoffDate: job.signoffDate,
+    lessonsLearned: job.lessonsLearned,
+    completedAt: job.completedAt,
+  };
   // Calculate variances
   const footageVariance = job.actualFootage - job.totalDistance;
   const footageVariancePercent = job.totalDistance > 0 
@@ -48,9 +125,12 @@ export function CompletionSummaryStep({ job }: CompletionSummaryStepProps) {
     <div className="space-y-6">
       {/* Overall Progress */}
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-6 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <FileText className="h-5 w-5" />
-          <h3 className="font-semibold">Job Completion Summary</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <FileText className="h-5 w-5" />
+            <h3 className="font-semibold">Job Completion Summary</h3>
+          </div>
+          <ReportExportButton job={reportData} reportType="completion-summary" variant="compact" />
         </div>
 
         <div className="text-center mb-4">
@@ -206,6 +286,95 @@ export function CompletionSummaryStep({ job }: CompletionSummaryStepProps) {
               {job.locationName || `${job.totalDistance.toLocaleString()} ft`}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Linked Field Logs */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 bg-blue-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-blue-600" />
+            <h3 className="font-medium text-slate-900">Linked Field Reports</h3>
+          </div>
+          {fieldLogSummary && fieldLogSummary.count > 0 && (
+            <span className="text-sm text-blue-600 font-medium">
+              {fieldLogSummary.count} report{fieldLogSummary.count !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <div className="p-4">
+          {loadingFieldLogs ? (
+            <div className="animate-pulse space-y-2">
+              <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+              <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+            </div>
+          ) : fieldLogs.length > 0 ? (
+            <div className="space-y-4">
+              {/* Summary Stats */}
+              {fieldLogSummary && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-lg font-bold text-blue-700">{fieldLogSummary.totalHours.toFixed(1)}</p>
+                    <p className="text-xs text-blue-600">Total Hours</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-lg font-bold text-blue-700">{fieldLogSummary.totalFootage.toLocaleString()}</p>
+                    <p className="text-xs text-blue-600">Footage</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-lg font-bold text-blue-700">{fieldLogSummary.totalPoles}</p>
+                    <p className="text-xs text-blue-600">Poles</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-lg font-bold text-blue-700">{fieldLogSummary.dates.length}</p>
+                    <p className="text-xs text-blue-600">Work Days</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Field Log List */}
+              <div className="space-y-2">
+                {fieldLogs.slice(0, 5).map((log) => (
+                  <div 
+                    key={log.id} 
+                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-slate-400" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">
+                          {new Date(log.date).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {log.workerCount} workers • {log.hoursWorked}h
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right text-sm">
+                      {((log.strandHungFootage || 0) + (log.fiberLashedFootage || 0) + (log.fiberPulledFootage || 0)) > 0 && (
+                        <span className="text-slate-600">
+                          {((log.strandHungFootage || 0) + (log.fiberLashedFootage || 0) + (log.fiberPulledFootage || 0)).toLocaleString()} ft
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {fieldLogs.length > 5 && (
+                  <p className="text-xs text-center text-slate-500">
+                    +{fieldLogs.length - 5} more report{fieldLogs.length - 5 !== 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-slate-500">
+              <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No field reports linked to this job yet</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Field reports can be linked when submitting daily work logs
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -35,6 +35,63 @@ export async function GET() {
   }
 }
 
+// PUT /api/assembly-categories - Bulk reorder categories
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (!user || !["SUPERUSER", "ADMIN"].includes(user.role)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { items } = body;
+
+    if (!Array.isArray(items)) {
+      return NextResponse.json({ error: "Items array is required" }, { status: 400 });
+    }
+
+    // Update all categories with their new order
+    await prisma.$transaction(
+      items.map((item: { id: string; order: number }) =>
+        prisma.assemblyCategory.update({
+          where: { id: item.id },
+          data: { order: item.order },
+        })
+      )
+    );
+
+    // Return updated categories
+    const categories = await prisma.assemblyCategory.findMany({
+      orderBy: [{ order: "asc" }, { name: "asc" }],
+      include: {
+        _count: {
+          select: {
+            types: true,
+            assemblies: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(categories);
+  } catch (error) {
+    console.error("Error reordering assembly categories:", error);
+    return NextResponse.json(
+      { error: "Failed to reorder categories" },
+      { status: 500 }
+    );
+  }
+}
+
 // POST /api/assembly-categories - Create a new category
 export async function POST(request: NextRequest) {
   try {

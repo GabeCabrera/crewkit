@@ -4,13 +4,12 @@ import { useState, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { FilterChips, CategoryBadge } from "@/components/ui/filter-chips";
 import { 
   Search, 
   CheckCircle2,
   Package,
-  ChevronRight,
   ChevronDown,
-  ChevronLeft,
   Minus,
   Plus,
   Check,
@@ -19,9 +18,6 @@ import {
   Clock,
   Repeat,
   Sparkles,
-  FolderTree,
-  Layers,
-  ArrowLeft,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -61,7 +57,7 @@ interface Assembly {
   categoryId?: string;
   typeId?: string;
   category?: { id: string; name: string } | null;
-  type?: { id: string; name: string } | null;
+  type?: { id: string; name: string; slug?: string } | null;
   items: AssemblyItem[];
   lastUsed?: string;
   totalUsed?: number;
@@ -77,12 +73,12 @@ interface AssemblyCategory {
 interface AssemblyType {
   id: string;
   name: string;
+  slug?: string;
   description: string | null;
   categoryId: string;
+  category?: { id: string; name: string };
   _count: { assemblies: number };
 }
-
-type FlowStep = "category" | "type" | "assembly" | "search";
 
 export default function FieldAssembliesPage() {
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
@@ -92,14 +88,9 @@ export default function FieldAssembliesPage() {
   const [allEquipment, setAllEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Flow state
-  const [currentStep, setCurrentStep] = useState<FlowStep>("category");
-  const [selectedCategory, setSelectedCategory] = useState<AssemblyCategory | null>(null);
-  const [selectedType, setSelectedType] = useState<AssemblyType | null>(null);
-  
-  // Search
+  // Filter state
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   
   // Assembly selection
   const [selectedAssembly, setSelectedAssembly] = useState<Assembly | null>(null);
@@ -143,97 +134,43 @@ export default function FieldAssembliesPage() {
     fetchData();
   }, []);
 
-  // Handle search mode
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      setCurrentStep("search");
-      setIsSearching(true);
-    } else if (isSearching) {
-      // Return to appropriate step when search is cleared
-      if (selectedType) {
-        setCurrentStep("assembly");
-      } else if (selectedCategory) {
-        setCurrentStep("type");
-      } else {
-        setCurrentStep("category");
-      }
-      setIsSearching(false);
-    }
-  }, [searchQuery, selectedCategory, selectedType, isSearching]);
+  // Category filter options with counts
+  const categoryFilterOptions = useMemo(() => {
+    return categories.map((cat) => ({
+      id: cat.id,
+      label: cat.name,
+      count: assemblies.filter((a) => a.categoryId === cat.id).length,
+    }));
+  }, [categories, assemblies]);
 
-  // Get types for selected category
-  const filteredTypes = useMemo(() => {
-    if (!selectedCategory) return [];
-    return types.filter(t => t.categoryId === selectedCategory.id);
-  }, [types, selectedCategory]);
-
-  // Get assemblies for selected category + type
+  // Filter assemblies by search and category
   const filteredAssemblies = useMemo(() => {
-    if (currentStep === "search" && searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      return assemblies.filter(a => 
-        a.name.toLowerCase().includes(query) ||
-        a.description?.toLowerCase().includes(query)
-      );
-    }
-    
-    if (!selectedCategory) return assemblies;
-    
-    // Filter by category
-    let filtered = assemblies.filter(a => a.categoryId === selectedCategory.id);
-    
-    // Further filter by type if selected
-    if (selectedType) {
-      filtered = filtered.filter(a => a.typeId === selectedType.id);
-    }
-    
-    return filtered;
-  }, [assemblies, selectedCategory, selectedType, searchQuery, currentStep]);
+    return assemblies.filter((assembly) => {
+      // Category filter
+      if (selectedCategories.length > 0 && !selectedCategories.includes(assembly.categoryId || "")) {
+        return false;
+      }
+      
+      // Search filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        return (
+          assembly.name.toLowerCase().includes(query) ||
+          assembly.description?.toLowerCase().includes(query) ||
+          assembly.type?.name.toLowerCase().includes(query) ||
+          assembly.category?.name.toLowerCase().includes(query)
+        );
+      }
+      
+      return true;
+    });
+  }, [assemblies, selectedCategories, searchQuery]);
 
   // Calculate assembly total
   const getAssemblyTotal = (assembly: Assembly) => {
     return assembly.items.reduce((sum, item) => 
       sum + (item.equipment.pricePerUnit * item.quantity), 0
     );
-  };
-
-  // Navigation handlers
-  const handleSelectCategory = (category: AssemblyCategory) => {
-    setSelectedCategory(category);
-    const categoryTypes = types.filter(t => t.categoryId === category.id);
-    
-    if (categoryTypes.length === 0) {
-      // No types, go directly to assemblies
-      setSelectedType(null);
-      setCurrentStep("assembly");
-    } else {
-      setCurrentStep("type");
-    }
-  };
-
-  const handleSelectType = (type: AssemblyType) => {
-    setSelectedType(type);
-    setCurrentStep("assembly");
-  };
-
-  const handleBack = () => {
-    if (currentStep === "search") {
-      setSearchQuery("");
-      return;
-    }
-    if (currentStep === "assembly") {
-      if (selectedType) {
-        setSelectedType(null);
-        setCurrentStep("type");
-      } else {
-        setSelectedCategory(null);
-        setCurrentStep("category");
-      }
-    } else if (currentStep === "type") {
-      setSelectedCategory(null);
-      setSelectedType(null);
-      setCurrentStep("category");
-    }
   };
 
   const handleSelectAssembly = (assembly: Assembly) => {
@@ -334,47 +271,21 @@ export default function FieldAssembliesPage() {
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  // Check if we have structured categories
-  const hasCategories = categories.length > 0;
-  
-  // Get breadcrumb
-  const breadcrumb = useMemo(() => {
-    const parts: string[] = [];
-    if (selectedCategory) parts.push(selectedCategory.name);
-    if (selectedType) parts.push(selectedType.name);
-    return parts;
-  }, [selectedCategory, selectedType]);
+  // Get type display name (short version for list)
+  const getTypeShortName = (type?: { name: string; slug?: string } | null) => {
+    if (!type) return null;
+    // If name has ":" prefix like "Strand: Terminal", take the part after
+    if (type.name.includes(":")) {
+      return type.name.split(":")[1].trim();
+    }
+    return type.name;
+  };
 
   return (
     <div className="min-h-screen bg-background">
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-background border-b">
-        <div className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
-          {/* Back button and breadcrumb */}
-          {(currentStep !== "category" || searchQuery) && (
-            <div className="flex items-center gap-2 mb-3">
-              <button
-                onClick={handleBack}
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </button>
-              {breadcrumb.length > 0 && !searchQuery && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  {breadcrumb.map((part, i) => (
-                    <span key={i} className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3" />
-                      <span className={cn(i === breadcrumb.length - 1 && "text-foreground font-medium")}>
-                        {part}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
+        <div className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 space-y-3">
           {/* Search */}
           <div className="relative max-w-2xl mx-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -393,6 +304,20 @@ export default function FieldAssembliesPage() {
               </button>
             )}
           </div>
+
+          {/* Category filter chips */}
+          {categoryFilterOptions.length > 0 && (
+            <div className="max-w-2xl mx-auto">
+              <FilterChips
+                options={categoryFilterOptions}
+                selected={selectedCategories}
+                onChange={setSelectedCategories}
+                allowMultiple={true}
+                showAll={true}
+                allLabel="All"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -425,329 +350,130 @@ export default function FieldAssembliesPage() {
           </div>
         ) : (
           <>
-            {/* Step 1: Category Selection */}
-            {currentStep === "category" && hasCategories && !searchQuery && (
-              <>
-                {/* Recent Assemblies */}
-                {recentAssemblies.length > 0 && (
-                  <section className="mb-6 sm:mb-8">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <h2 className="text-sm font-medium text-muted-foreground">Quick Access</h2>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {recentAssemblies.map((assembly) => (
-                        <button
-                          key={assembly.id}
-                          onClick={() => handleSelectAssembly(assembly)}
-                          disabled={isSubmitting}
-                          className="relative text-left bg-card border rounded-2xl p-3 sm:p-4 hover:border-primary/50 hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
-                        >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleQuickLog(assembly, 1);
-                            }}
-                            disabled={isSubmitting}
-                            className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
-                            title="Quick log 1×"
-                          >
-                            <Repeat className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
-                          </button>
-                          
-                          <div className="pr-7 sm:pr-8">
-                            <p className="font-semibold text-sm leading-tight line-clamp-2">
-                              {assembly.name}
-                            </p>
-                            <div className="flex items-center gap-1.5 mt-1.5 sm:mt-2 text-xs text-muted-foreground">
-                              <span>{assembly.items.length} items</span>
-                              <span>•</span>
-                              <span className="font-medium text-foreground">
-                                {formatCurrency(getAssemblyTotal(assembly))}
-                              </span>
-                            </div>
-                            {assembly.lastUsed && (
-                              <p className="text-[10px] text-muted-foreground mt-1 sm:mt-1.5 flex items-center gap-1">
-                                <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                                {formatTimeAgo(assembly.lastUsed)}
-                              </p>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* Categories Grid */}
-                <section>
-                  <div className="flex items-center gap-2 mb-3">
-                    <FolderTree className="h-4 w-4 text-muted-foreground" />
-                    <h2 className="text-sm font-medium text-muted-foreground">Select Category</h2>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {categories.map((category) => (
-                      <button
-                        key={category.id}
-                        onClick={() => handleSelectCategory(category)}
-                        className="text-left bg-card border rounded-2xl p-4 sm:p-5 hover:border-primary/50 hover:shadow-md transition-all active:scale-[0.98]"
-                      >
-                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-                          <FolderTree className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                        </div>
-                        <h3 className="font-semibold text-base sm:text-lg">{category.name}</h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {category._count.types} types · {category._count.assemblies} assemblies
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                {/* Show all assemblies link */}
-                <div className="mt-6 text-center">
-                  <button
-                    onClick={() => {
-                      setSelectedCategory(null);
-                      setSelectedType(null);
-                      setCurrentStep("assembly");
-                    }}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    View all {assemblies.length} assemblies
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Step 2: Type Selection */}
-            {currentStep === "type" && selectedCategory && !searchQuery && (
-              <section>
+            {/* Recent Assemblies - Only show when no filters active */}
+            {recentAssemblies.length > 0 && !searchQuery && selectedCategories.length === 0 && (
+              <section className="mb-6 sm:mb-8">
                 <div className="flex items-center gap-2 mb-3">
-                  <Layers className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="text-sm font-medium text-muted-foreground">
-                    Select Type in {selectedCategory.name}
-                  </h2>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <h2 className="text-sm font-medium text-muted-foreground">Quick Access</h2>
                 </div>
-                
-                {filteredTypes.length === 0 ? (
-                  <div className="text-center py-12">
-                    <p className="text-muted-foreground">No types in this category</p>
-                    <button 
-                      onClick={() => setCurrentStep("assembly")}
-                      className="text-primary text-sm mt-2 hover:underline"
-                    >
-                      View assemblies anyway
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    {filteredTypes.map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => handleSelectType(type)}
-                        className="text-left bg-card border rounded-2xl p-4 sm:p-5 hover:border-primary/50 hover:shadow-md transition-all active:scale-[0.98]"
-                      >
-                        <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-secondary flex items-center justify-center mb-3">
-                          <Layers className="h-5 w-5 sm:h-6 sm:w-6 text-secondary-foreground" />
-                        </div>
-                        <h3 className="font-semibold text-base sm:text-lg">{type.name}</h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {type._count.assemblies} assemblies
-                        </p>
-                      </button>
-                    ))}
-                    
-                    {/* View all in category */}
+                <div className="grid grid-cols-2 gap-3">
+                  {recentAssemblies.map((assembly) => (
                     <button
-                      onClick={() => {
-                        setSelectedType(null);
-                        setCurrentStep("assembly");
-                      }}
-                      className="text-left bg-muted/50 border border-dashed rounded-2xl p-4 sm:p-5 hover:bg-muted transition-all"
+                      key={assembly.id}
+                      onClick={() => handleSelectAssembly(assembly)}
+                      disabled={isSubmitting}
+                      className="relative text-left bg-card border rounded-2xl p-3 sm:p-4 hover:border-primary/50 hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
                     >
-                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-muted flex items-center justify-center mb-3">
-                        <Package className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleQuickLog(assembly, 1);
+                        }}
+                        disabled={isSubmitting}
+                        className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
+                        title="Quick log 1×"
+                      >
+                        <Repeat className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
+                      </button>
+                      
+                      <div className="pr-7 sm:pr-8">
+                        <p className="font-semibold text-sm leading-tight line-clamp-2">
+                          {assembly.name}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1.5 sm:mt-2 text-xs text-muted-foreground">
+                          <span>{assembly.items.length} items</span>
+                          <span>•</span>
+                          <span className="font-medium text-foreground">
+                            {formatCurrency(getAssemblyTotal(assembly))}
+                          </span>
+                        </div>
+                        {assembly.lastUsed && (
+                          <p className="text-[10px] text-muted-foreground mt-1 sm:mt-1.5 flex items-center gap-1">
+                            <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                            {formatTimeAgo(assembly.lastUsed)}
+                          </p>
+                        )}
                       </div>
-                      <h3 className="font-semibold text-base sm:text-lg text-muted-foreground">
-                        All Types
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        View all in {selectedCategory.name}
-                      </p>
                     </button>
-                  </div>
-                )}
+                  ))}
+                </div>
               </section>
             )}
 
-            {/* Step 3: Assembly Selection (or Search Results or All) */}
-            {(currentStep === "assembly" || currentStep === "search" || (!hasCategories && currentStep === "category")) && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="text-sm font-medium text-muted-foreground">
-                    {searchQuery 
-                      ? "Search Results" 
-                      : selectedType 
-                        ? selectedType.name
-                        : selectedCategory 
-                          ? `All in ${selectedCategory.name}`
-                          : "All Assemblies"}
-                  </h2>
-                  <span className="text-xs text-muted-foreground">
-                    ({filteredAssemblies.length})
-                  </span>
-                </div>
+            {/* All Assemblies List */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  {searchQuery ? "Search Results" : selectedCategories.length > 0 ? "Filtered" : "All Assemblies"}
+                </h2>
+                <span className="text-xs text-muted-foreground">
+                  ({filteredAssemblies.length})
+                </span>
+              </div>
 
-                {filteredAssemblies.length === 0 ? (
-                  <div className="text-center py-12 sm:py-16">
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-                      <Package className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-                    </div>
-                    <p className="text-muted-foreground font-medium">No assemblies found</p>
+              {filteredAssemblies.length === 0 ? (
+                <div className="text-center py-12 sm:py-16">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                    <Package className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground font-medium">No assemblies found</p>
+                  {(searchQuery || selectedCategories.length > 0) && (
                     <button 
                       onClick={() => {
                         setSearchQuery("");
-                        setSelectedCategory(null);
-                        setSelectedType(null);
-                        setCurrentStep("category");
+                        setSelectedCategories([]);
                       }}
                       className="text-primary text-sm mt-2 hover:underline"
                     >
                       Clear filters
                     </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredAssemblies.map((assembly) => (
-                      <button
-                        key={assembly.id}
-                        onClick={() => handleSelectAssembly(assembly)}
-                        className="w-full text-left bg-card border rounded-xl p-3 sm:p-4 hover:border-primary/50 transition-all active:scale-[0.99]"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium truncate text-sm sm:text-base">{assembly.name}</h3>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              <span>{assembly.items.length} items</span>
-                              <span>•</span>
-                              <span className="font-medium text-foreground">
-                                {formatCurrency(getAssemblyTotal(assembly))}
-                              </span>
-                            </div>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredAssemblies.map((assembly) => (
+                    <button
+                      key={assembly.id}
+                      onClick={() => handleSelectAssembly(assembly)}
+                      className="w-full text-left bg-card border rounded-xl p-3 sm:p-4 hover:border-primary/50 transition-all active:scale-[0.99]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <Package className="h-4 w-4 text-muted-foreground" />
                         </div>
-                        {/* Show category/type badges if viewing all */}
-                        {(!selectedCategory || searchQuery) && (assembly.category || assembly.type) && (
-                          <div className="flex gap-1.5 mt-2 flex-wrap">
-                            {assembly.category && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                                {assembly.category.name}
-                              </Badge>
-                            )}
-                            {assembly.type && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                {assembly.type.name}
-                              </Badge>
-                            )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium truncate text-sm sm:text-base">{assembly.name}</h3>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                            <span>{assembly.items.length} items</span>
+                            <span>•</span>
+                            <span className="font-medium text-foreground">
+                              {formatCurrency(getAssemblyTotal(assembly))}
+                            </span>
                           </div>
+                        </div>
+                        {/* Type badge on the right */}
+                        {assembly.category && (
+                          <CategoryBadge 
+                            category={assembly.category.name} 
+                            className="shrink-0"
+                          />
                         )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Fallback: No categories, show legacy category pills */}
-            {!hasCategories && currentStep === "category" && !searchQuery && (
-              <>
-                {/* Recent Assemblies */}
-                {recentAssemblies.length > 0 && (
-                  <section className="mb-6 sm:mb-8">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <h2 className="text-sm font-medium text-muted-foreground">Recent</h2>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {recentAssemblies.map((assembly) => (
-                        <button
-                          key={assembly.id}
-                          onClick={() => handleSelectAssembly(assembly)}
-                          disabled={isSubmitting}
-                          className="relative text-left bg-card border rounded-2xl p-3 sm:p-4 hover:border-primary/50 hover:shadow-md transition-all active:scale-[0.98] disabled:opacity-50"
-                        >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleQuickLog(assembly, 1);
-                            }}
-                            disabled={isSubmitting}
-                            className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-colors"
-                            title="Quick log 1×"
-                          >
-                            <Repeat className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary" />
-                          </button>
-                          
-                          <div className="pr-7 sm:pr-8">
-                            <p className="font-semibold text-sm leading-tight line-clamp-2">
-                              {assembly.name}
-                            </p>
-                            <div className="flex items-center gap-1.5 mt-1.5 sm:mt-2 text-xs text-muted-foreground">
-                              <span>{assembly.items.length} items</span>
-                              <span>•</span>
-                              <span className="font-medium text-foreground">
-                                {formatCurrency(getAssemblyTotal(assembly))}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* All Assemblies */}
-                <section>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <h2 className="text-sm font-medium text-muted-foreground">All Assemblies</h2>
-                    <span className="text-xs text-muted-foreground">({assemblies.length})</span>
-                  </div>
-                  <div className="space-y-2">
-                    {assemblies.map((assembly) => (
-                      <button
-                        key={assembly.id}
-                        onClick={() => handleSelectAssembly(assembly)}
-                        className="w-full text-left bg-card border rounded-xl p-3 sm:p-4 hover:border-primary/50 transition-all active:scale-[0.99]"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                            <Package className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium truncate text-sm sm:text-base">{assembly.name}</h3>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              <span>{assembly.items.length} items</span>
-                              <span>•</span>
-                              <span className="font-medium text-foreground">
-                                {formatCurrency(getAssemblyTotal(assembly))}
-                              </span>
-                            </div>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </div>
+                      {/* Type shown below if present and different from category */}
+                      {assembly.type && (
+                        <div className="mt-2 pl-12 sm:pl-[52px]">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {getTypeShortName(assembly.type)}
+                          </Badge>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              </>
-            )}
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
           </>
         )}
       </div>
@@ -774,15 +500,13 @@ export default function FieldAssembliesPage() {
                       </p>
                     )}
                     {(selectedAssembly.category || selectedAssembly.type) && (
-                      <div className="flex gap-1.5 mt-2">
+                      <div className="flex gap-1.5 mt-2 flex-wrap">
                         {selectedAssembly.category && (
-                          <Badge variant="outline" className="text-xs">
-                            {selectedAssembly.category.name}
-                          </Badge>
+                          <CategoryBadge category={selectedAssembly.category.name} />
                         )}
                         {selectedAssembly.type && (
                           <Badge variant="secondary" className="text-xs">
-                            {selectedAssembly.type.name}
+                            {getTypeShortName(selectedAssembly.type)}
                           </Badge>
                         )}
                       </div>

@@ -33,7 +33,7 @@ export const JOB_BUILD_TYPE_DESCRIPTIONS: Record<JobBuildType, string> = {
 // ============================================================================
 
 /**
- * Assembly types that are included in each build type.
+ * Assembly types (slugs) that are included in each build type.
  * Used to filter detected features when calculating BOM.
  */
 export const BUILD_TYPE_ASSEMBLY_TYPES: Record<JobBuildType, AssemblyType[] | "*"> = {
@@ -42,29 +42,33 @@ export const BUILD_TYPE_ASSEMBLY_TYPES: Record<JobBuildType, AssemblyType[] | "*
   
   // Strand Build - pole attachments, strand hardware, anchors
   strand_build: [
-    "Terminal Pole",
-    "Tangent Pole",
-    "Corner Pole",
-    "Junction Pole",
-    "Intermediate Pole",
-    "Guy/Anchor",
+    "strand.terminal",
+    "strand.tangent",
+    "strand.corner",
+    "strand.junction",
+    "hardware.anchor",
   ],
   
-  // Fiber Build - fiber, lashing, splices
+  // Fiber Build - fiber lashing, pole attachments, splices
   fiber_build: [
-    "Splice Case",
-    "Riser",
+    "fiber.terminal",
+    "fiber.tangent",
+    "fiber.corner",
+    "fiber.junction",
+    "fiber.splice",
+    "underground.riser",
   ],
   
   // Peripheral Build - MSTs, drops, slack loops
   peripheral_build: [
-    "MST",
-    "MST 2-Port",
-    "MST 6-Port",
-    "Slack Loop",
-    "Pedestal",
-    "Handhole",
-    "Vault",
+    "service.mst",
+    "service.mst2",
+    "service.mst6",
+    "service.mst8",
+    "fiber.slack",
+    "service.pedestal",
+    "underground.handhole",
+    "underground.vault",
   ],
 };
 

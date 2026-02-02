@@ -27,12 +27,23 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const assignedToMe = searchParams.get("assignedToMe") === "true";
+    
+    // Pagination params
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10) || 50));
+    const skip = (page - 1) * limit;
 
     // Build the where clause
     const where: Record<string, unknown> = {};
     
+    // Parse comma-separated status values for filtering multiple statuses
     if (status) {
-      where.status = status;
+      const statuses = status.split(",").map(s => s.trim()).filter(Boolean);
+      if (statuses.length === 1) {
+        where.status = statuses[0];
+      } else if (statuses.length > 1) {
+        where.status = { in: statuses };
+      }
     }
 
     // Field users only see jobs assigned to them
@@ -44,44 +55,58 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const jobPlans = await prisma.jobPlan.findMany({
-      where,
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    // Execute count and data queries in parallel for better performance
+    const [jobPlans, totalCount] = await Promise.all([
+      prisma.jobPlan.findMany({
+        where,
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
-        },
-        assignments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
+          assignments: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
               },
             },
           },
-        },
-        projectArea: {
-          select: {
-            id: true,
-            name: true,
-            prefix: true,
+          projectArea: {
+            select: {
+              id: true,
+              name: true,
+              prefix: true,
+            },
+          },
+          _count: {
+            select: {
+              comments: true,
+            },
           },
         },
-        _count: {
-          select: {
-            comments: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.jobPlan.count({ where }),
+    ]);
 
-    return NextResponse.json(jobPlans);
+    return NextResponse.json({
+      jobPlans,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching job plans:", error);
     return NextResponse.json(

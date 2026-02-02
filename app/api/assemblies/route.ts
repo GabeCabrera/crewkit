@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const approved = searchParams.get("approved");
+    const includeLegacy = searchParams.get("includeLegacy") === "true";
+    const legacyOnly = searchParams.get("legacyOnly") === "true";
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50")));
     const fetchAll = searchParams.get("all") === "true";
@@ -28,6 +30,13 @@ export async function GET(request: NextRequest) {
     if (approved === "true") {
       where.status = "APPROVED";
     }
+    
+    // Legacy filtering: hide legacy by default unless explicitly requested
+    if (legacyOnly) {
+      where.isLegacy = true;
+    } else if (!includeLegacy) {
+      where.isLegacy = false;
+    }
 
     // For dropdown/combobox use cases that need all items
     if (fetchAll) {
@@ -38,6 +47,7 @@ export async function GET(request: NextRequest) {
           name: true,
           description: true,
           status: true,
+          isLegacy: true,
           categories: true,
           categoryId: true,
           typeId: true,
@@ -86,6 +96,7 @@ export async function GET(request: NextRequest) {
           name: true,
           description: true,
           status: true,
+          isLegacy: true,
           categories: true,
           categoryId: true,
           typeId: true,

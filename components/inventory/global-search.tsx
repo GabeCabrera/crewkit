@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { matchesWithSynonyms, expandSearchQuery } from "@/lib/equipment-synonyms";
-import type { Equipment, Assembly } from "@/app/admin/inventory/page";
+import type { Equipment, Assembly } from "@/components/inventory/inventory-layout";
 
 interface GlobalSearchProps {
   open: boolean;

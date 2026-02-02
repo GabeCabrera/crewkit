@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  X,
   Printer,
   MapPin,
   Package,
@@ -34,9 +34,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { JobComments } from "./job-comments";
+import { ReportDownloadBar } from "./report-download-bar";
 import { cn } from "@/lib/utils";
 import { getAvailableStatusOptions, JobPlanStatus } from "@/lib/validations";
+import { useJobPlan, jobPlanKeys } from "@/lib/queries/job-plans";
+import type { JobPlanData } from "./job-lifecycle-view";
 
 interface Assignment {
   id: string;
@@ -88,6 +97,7 @@ interface JobPlanDetail {
   jobName: string;
   jobNumber: string | null;
   locationName: string | null;
+  locationAddress: string | null;
   vetroProjectUrl: string | null;
   totalDistance: number;
   poleCount: number;
@@ -96,6 +106,20 @@ interface JobPlanDetail {
   deadEnds: number;
   tangents: number;
   anchors: number;
+  // Actual construction values
+  actualFootage: number;
+  actualPolesComplete: number;
+  actualStrandUsed: number;
+  actualFiberUsed: number;
+  actualDeadEnds: number;
+  actualTangents: number;
+  actualAnchors: number;
+  totalCrewHours: number;
+  // Reporting
+  foremanSignoff: boolean;
+  signoffDate: string | null;
+  lessonsLearned: string | null;
+  completedAt: string | null;
   // Legacy permit fields (kept for backwards compatibility)
   rmpPermitApproved: boolean;
   sesdPermitApproved: boolean;
@@ -121,7 +145,7 @@ interface JobPlanDetail {
 }
 
 interface JobDetailPanelProps {
-  jobId: string;
+  jobId: string | null;
   onClose: () => void;
   onUpdate?: () => void;
   basePath?: string; // e.g., "/admin/jobs" or "/manager/jobs"
@@ -137,8 +161,7 @@ const statusOptions: { value: JobPlanStatus; label: string; color: string }[] = 
 
 export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jobs" }: JobDetailPanelProps) {
   const { data: session } = useSession();
-  const [job, setJob] = useState<JobPlanDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [isAssigning, setIsAssigning] = useState(false);
@@ -146,6 +169,11 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
   const [expandedPermits, setExpandedPermits] = useState<Set<string>>(new Set());
 
   const canManage = session?.user?.role && ["MANAGER", "ADMIN", "SUPERUSER"].includes(session.user.role);
+
+  // Use React Query for job data fetching with caching
+  const { data: job, isLoading, refetch: refetchJob } = useJobPlan(jobId, {
+    enabled: !!jobId,
+  });
 
   // Get available status options based on current job state
   const availableStatuses = useMemo(() => {
@@ -157,7 +185,7 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       makeReadyComplete: job.makeReadyComplete,
       easementsClear: job.easementsClear,
       // Include dynamic permits for validation
-      permits: job.permits?.map(p => ({ id: p.id, isApproved: p.isApproved })),
+      permits: job.permits?.map((p: { id: string; isApproved: boolean }) => ({ id: p.id, isApproved: p.isApproved })),
       jobName: job.jobName,
       jobNumber: job.jobNumber,
       locationName: job.locationName,
@@ -168,20 +196,6 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       assignments: job.assignments,
     });
   }, [job]);
-
-  const fetchJob = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/job-plans/${jobId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setJob(data);
-      }
-    } catch (error) {
-      console.error("Error fetching job:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [jobId]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -195,12 +209,12 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
     }
   }, []);
 
+  // Fetch users when panel opens (only for managers)
   useEffect(() => {
-    fetchJob();
-    if (canManage) {
+    if (jobId && canManage) {
       fetchUsers();
     }
-  }, [fetchJob, fetchUsers, canManage]);
+  }, [jobId, fetchUsers, canManage]);
 
   const updateStatus = async (newStatus: JobPlanStatus) => {
     setStatusError(null);
@@ -212,7 +226,9 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       });
 
       if (response.ok) {
-        setJob((prev) => prev ? { ...prev, status: newStatus } : null);
+        // Invalidate and refetch to update cache
+        queryClient.invalidateQueries({ queryKey: jobPlanKeys.detail(jobId!) });
+        queryClient.invalidateQueries({ queryKey: jobPlanKeys.lists() });
         onUpdate?.();
       } else {
         const errorData = await response.json();
@@ -236,7 +252,9 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       });
 
       if (response.ok) {
-        fetchJob();
+        // Invalidate and refetch the job data
+        queryClient.invalidateQueries({ queryKey: jobPlanKeys.detail(jobId!) });
+        queryClient.invalidateQueries({ queryKey: jobPlanKeys.lists() });
         setSelectedUserId("");
         onUpdate?.();
       }
@@ -254,7 +272,9 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
       });
 
       if (response.ok) {
-        fetchJob();
+        // Invalidate and refetch the job data
+        queryClient.invalidateQueries({ queryKey: jobPlanKeys.detail(jobId!) });
+        queryClient.invalidateQueries({ queryKey: jobPlanKeys.lists() });
         onUpdate?.();
       }
     } catch (error) {
@@ -266,62 +286,50 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
     window.print();
   };
 
-  if (isLoading) {
-    return (
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-2xl z-50 overflow-hidden">
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-pulse text-slate-400">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!job) {
-    return (
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-2xl z-50 overflow-hidden">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-slate-400">Job not found</div>
-        </div>
-      </div>
-    );
-  }
-
-  const activeHazards = [
+  const activeHazards = job ? [
     job.trafficControl && { icon: Car, label: "Traffic Control" },
     job.treeTrimming && { icon: TreePine, label: "Tree Trimming" },
     job.animalHazards && { icon: Bug, label: "Animal Hazards" },
     job.waterRailCrossing && { icon: Waves, label: "Water/Rail Crossing" },
-  ].filter(Boolean) as { icon: typeof Car; label: string }[];
+  ].filter(Boolean) as { icon: typeof Car; label: string }[] : [];
 
-  const unassignedUsers = availableUsers.filter(
+  const unassignedUsers = job ? availableUsers.filter(
     (user) => !job.assignments.some((a) => a.user.id === user.id)
-  );
+  ) : [];
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-[480px] bg-white shadow-2xl z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-slate-50 no-print">
-        <h2 className="text-lg font-semibold text-slate-900 truncate pr-4">
-          {job.jobName}
-        </h2>
-        <div className="flex items-center gap-2">
-          <Link href={`${basePath}/${jobId}`}>
-            <Button variant="outline" size="sm" title="Open full view">
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Printer className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+    <Sheet open={!!jobId} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent side="right" className="w-full sm:w-[480px] p-0 flex flex-col">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-pulse text-slate-400">Loading...</div>
+          </div>
+        ) : !job ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-slate-400">Job not found</div>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <SheetHeader className="flex-row items-center justify-between p-4 border-b bg-slate-50 no-print space-y-0">
+              <SheetTitle className="text-lg font-semibold text-slate-900 truncate pr-4">
+                {job.jobName}
+              </SheetTitle>
+              <div className="flex items-center gap-2">
+                <Link href={`${basePath}/${jobId}`}>
+                  <Button variant="outline" size="sm" title="Open full view">
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button variant="outline" size="sm" onClick={handlePrint}>
+                  <Printer className="h-4 w-4" />
+                </Button>
+              </div>
+            </SheetHeader>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4 space-y-6">
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-6">
           {/* Status */}
           <div className="no-print">
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -639,20 +647,31 @@ export function JobDetailPanel({ jobId, onClose, onUpdate, basePath = "/admin/jo
             )}
           </div>
 
-          {/* Comments */}
-          <div className="no-print border-t pt-4">
-            <JobComments jobPlanId={jobId} />
-          </div>
-        </div>
-      </div>
+                {/* Reports Download */}
+                <div className="no-print border-t pt-4">
+                  <ReportDownloadBar 
+                    job={job as unknown as JobPlanData} 
+                    variant="compact" 
+                  />
+                </div>
 
-      {/* Footer */}
-      <div className="p-4 border-t bg-slate-50 no-print">
-        <p className="text-xs text-slate-400">
-          Created by {job.createdBy.name || job.createdBy.email} on{" "}
-          {new Date(job.createdAt).toLocaleDateString()}
-        </p>
-      </div>
-    </div>
+                {/* Comments */}
+                <div className="no-print border-t pt-4">
+                  <JobComments jobPlanId={jobId!} />
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-slate-50 no-print">
+              <p className="text-xs text-slate-400">
+                Created by {job.createdBy.name || job.createdBy.email} on{" "}
+                {new Date(job.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

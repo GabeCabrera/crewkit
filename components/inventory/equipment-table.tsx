@@ -33,7 +33,7 @@ import {
   Package,
 } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
-import type { Equipment, Assembly } from "@/app/admin/inventory/page";
+import type { Equipment, Assembly } from "@/components/inventory/inventory-layout";
 
 interface SyncStatus {
   isSyncing: boolean;

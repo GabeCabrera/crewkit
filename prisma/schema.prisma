@@ -114,7 +114,8 @@ model AssemblyCategory {
 
 model AssemblyType {
   id          String           @id @default(cuid())
-  name        String
+  slug        String?          @unique // Machine-readable identifier (e.g., "strand.terminal")
+  name        String                   // Display name (e.g., "Strand: Terminal Pole")
   description String?
   order       Int              @default(0)
   categoryId  String
@@ -124,7 +125,7 @@ model AssemblyType {
 
   assemblies Assembly[]
 
-  @@unique([name, categoryId])
+  @@index([categoryId])
 }
 
 model Assembly {
@@ -132,6 +133,7 @@ model Assembly {
   name        String
   description String?
   status      AssemblyStatus     @default(DRAFT)
+  isLegacy    Boolean            @default(false) // Hide from default views without deleting
   categories  String[]           @default([]) // DEPRECATED: kept for migration
   categoryId  String?
   category    AssemblyCategory?  @relation(fields: [categoryId], references: [id])
@@ -147,6 +149,7 @@ model Assembly {
 
   @@index([categoryId])
   @@index([typeId])
+  @@index([isLegacy])
 }
 
 model AssemblyItem {
@@ -274,6 +277,17 @@ model FieldWorkLog {
   reportId String?
   report   EndOfDayReport? @relation(fields: [reportId], references: [id])
 
+  // Job Plan link (optional - not all field logs are job-specific)
+  jobPlanId String?
+  jobPlan   JobPlan? @relation(fields: [jobPlanId], references: [id], onDelete: SetNull)
+  
+  // Visual progress tracking - IDs of items marked complete in this log
+  completedInfraIds String[]  // Infrastructure item IDs marked complete
+  completedFiberIds String[]  // Fiber segment IDs marked complete
+  
+  // Sync tracking
+  syncedAt  DateTime?  // Last time this was synced to job logs
+
   // Original timestamp from import
   originalTimestamp DateTime?
 
@@ -284,6 +298,7 @@ model FieldWorkLog {
   @@index([location])
   @@index([teamId])
   @@index([createdById])
+  @@index([jobPlanId])
 }
 
 // ============================================================
@@ -456,6 +471,9 @@ model JobPlan {
   materialLogs  MaterialUsageLog[]
   crewHoursLogs CrewHoursLog[]
   issueLogs     IssueLog[]
+  
+  // Linked field work logs (from field reports)
+  fieldWorkLogs FieldWorkLog[]
 
   // Dynamic permits system
   permits JobPermit[]
@@ -749,12 +767,18 @@ model JobFiberSegment {
   // Selection tracking
   isSelected    Boolean   @default(false)  // Included in job scope?
   
+  // Progress tracking (added for as-built progress)
+  isCompleted   Boolean   @default(false)  // Construction complete?
+  completedAt   DateTime?
+  completedById String?
+  
   createdAt DateTime @default(now())
   
   @@index([bomId])
   @@index([segmentType])
   @@index([sourceFileId])
   @@index([isSelected])
+  @@index([isCompleted])
 }
 
 // Infrastructure points (MSTs, Vaults, Handholes, Splices, etc.)

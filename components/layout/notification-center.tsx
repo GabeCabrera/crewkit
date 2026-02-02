@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Briefcase, MessageSquare, AtSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,92 +13,46 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-interface Notification {
-  id: string;
-  type: "JOB_ASSIGNED" | "COMMENT_MENTION" | "COMMENT_REPLY";
-  userId: string;
-  jobPlanId: string | null;
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
-}
+import {
+  useNotifications,
+  useMarkNotificationsRead,
+  useMarkAllNotificationsRead,
+  type Notification,
+} from "@/lib/queries/notifications";
 
 export function NotificationCenter() {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const response = await fetch("/api/notifications?limit=10");
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data.notifications);
-        setUnreadCount(data.unreadCount);
-      }
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  // Track tab visibility to pause polling when hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(document.visibilityState === "visible");
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
-  useEffect(() => {
-    fetchNotifications();
-    
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
-    
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  // Use React Query for notifications with smart polling
+  const { data, isLoading } = useNotifications({
+    limit: 10,
+    isOpen, // Faster polling when dropdown is open
+    enabled: isVisible, // Pause polling when tab is hidden
+  });
 
-  // Refetch when dropdown opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
-  }, [isOpen, fetchNotifications]);
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
 
-  const markAsRead = async (notificationIds: string[]) => {
-    try {
-      await fetch("/api/notifications/read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notificationIds }),
-      });
-      
-      setNotifications((prev) =>
-        prev.map((n) =>
-          notificationIds.includes(n.id) ? { ...n, isRead: true } : n
-        )
-      );
-      setUnreadCount((prev) => Math.max(0, prev - notificationIds.length));
-    } catch (error) {
-      console.error("Error marking notifications as read:", error);
-    }
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      await fetch("/api/notifications/read-all", {
-        method: "POST",
-      });
-      
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-    } catch (error) {
-      console.error("Error marking all notifications as read:", error);
-    }
-  };
+  // Mutations for marking notifications as read
+  const markAsReadMutation = useMarkNotificationsRead();
+  const markAllAsReadMutation = useMarkAllNotificationsRead();
 
   const handleNotificationClick = (notification: Notification) => {
-    // Mark as read
+    // Mark as read using optimistic update
     if (!notification.isRead) {
-      markAsRead([notification.id]);
+      markAsReadMutation.mutate([notification.id]);
     }
     
     // Navigate to job if applicable
@@ -155,9 +109,10 @@ export function NotificationCenter() {
               variant="ghost"
               size="sm"
               className="h-auto py-1 px-2 text-xs"
+              disabled={markAllAsReadMutation.isPending}
               onClick={(e) => {
                 e.preventDefault();
-                markAllAsRead();
+                markAllAsReadMutation.mutate();
               }}
             >
               <CheckCheck className="h-3 w-3 mr-1" />

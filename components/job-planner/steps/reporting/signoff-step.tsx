@@ -1,10 +1,13 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckSquare, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { CheckSquare, AlertCircle, CheckCircle2, XCircle, FileDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
+import type { JobReportData, HoursLogData } from "@/lib/report-export";
+import { generateFullReportPDF, downloadPDF, sanitizeFilename } from "@/lib/report-export";
 
 interface SignoffStepProps {
   job: JobPlanData;
@@ -14,6 +17,66 @@ interface SignoffStepProps {
 
 export function SignoffStep({ job, updateJob, canEdit }: SignoffStepProps) {
   const { data: session } = useSession();
+  const [hoursLogs, setHoursLogs] = useState<HoursLogData[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Fetch hours logs for full report export
+  const fetchHoursLogs = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/job-plans/${job.id}/logs/hours`);
+      if (response.ok) {
+        const data = await response.json();
+        setHoursLogs(data);
+      }
+    } catch (error) {
+      console.error("Error fetching hours logs:", error);
+    }
+  }, [job.id]);
+
+  useEffect(() => {
+    fetchHoursLogs();
+  }, [fetchHoursLogs]);
+
+  // Convert job data for export
+  const reportData: JobReportData = {
+    id: job.id,
+    jobName: job.jobName,
+    jobNumber: job.jobNumber,
+    locationName: job.locationName,
+    locationAddress: job.locationAddress,
+    status: job.status,
+    totalDistance: job.totalDistance,
+    strandFootage: job.strandFootage,
+    fiberFootage: job.fiberFootage,
+    deadEnds: job.deadEnds,
+    tangents: job.tangents,
+    anchors: job.anchors,
+    poleCount: job.poleCount,
+    actualFootage: job.actualFootage,
+    actualPolesComplete: job.actualPolesComplete,
+    actualStrandUsed: job.actualStrandUsed,
+    actualFiberUsed: job.actualFiberUsed,
+    actualDeadEnds: job.actualDeadEnds,
+    actualTangents: job.actualTangents,
+    actualAnchors: job.actualAnchors,
+    totalCrewHours: job.totalCrewHours,
+    foremanSignoff: job.foremanSignoff,
+    signoffDate: job.signoffDate,
+    lessonsLearned: job.lessonsLearned,
+    completedAt: job.completedAt,
+  };
+
+  const handleExportFullReport = async () => {
+    setIsExporting(true);
+    try {
+      const doc = generateFullReportPDF(reportData, hoursLogs);
+      const jobSlug = sanitizeFilename(job.jobName);
+      const date = new Date().toISOString().split("T")[0];
+      downloadPDF(doc, `${jobSlug}-completion-report-${date}.pdf`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Check requirements
   const allPermitsChecked =
@@ -200,6 +263,53 @@ export function SignoffStep({ job, updateJob, canEdit }: SignoffStepProps) {
           )}
         </div>
       )}
+
+      {/* Export Full Report - Always available */}
+      <div className={cn(
+        "rounded-xl p-6",
+        job.foremanSignoff ? "bg-emerald-50 border border-emerald-200" : "bg-slate-50"
+      )}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="font-medium text-slate-900">Job Completion Report</h4>
+              {!job.foremanSignoff && (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                  DRAFT
+                </span>
+              )}
+              {job.foremanSignoff && (
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                  FINAL
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-slate-500">
+              {job.foremanSignoff 
+                ? "Download a comprehensive PDF report with all job details, as-built comparison, hours summary, and lessons learned."
+                : "Download a draft report. Sign off above to generate the final version."
+              }
+            </p>
+          </div>
+          <button
+            onClick={handleExportFullReport}
+            disabled={isExporting}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap",
+              job.foremanSignoff 
+                ? "text-white bg-emerald-600 hover:bg-emerald-700"
+                : "text-white bg-slate-800 hover:bg-slate-700"
+            )}
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            {job.foremanSignoff ? "Export Final Report" : "Export Draft Report"}
+          </button>
+        </div>
+      </div>
 
       {/* Undo Sign-off */}
       {job.foremanSignoff && canEdit && (

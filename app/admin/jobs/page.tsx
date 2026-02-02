@@ -71,15 +71,13 @@ function JobsPageContent() {
         />
       </div>
 
-      {/* Job Detail Panel */}
-      {selectedJobId && (
-        <JobDetailPanel
-          jobId={selectedJobId}
-          onClose={handleCloseDetail}
-          onUpdate={handleJobUpdated}
-          basePath="/admin/jobs"
-        />
-      )}
+      {/* Job Detail Panel - Sheet handles open/close state */}
+      <JobDetailPanel
+        jobId={selectedJobId}
+        onClose={handleCloseDetail}
+        onUpdate={handleJobUpdated}
+        basePath="/admin/jobs"
+      />
 
       {/* Job Creation Wizard */}
       <JobCreationWizard

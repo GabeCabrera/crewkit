@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { GroupedTypeSelect } from "@/components/ui/grouped-type-select";
 import { 
   Plus, 
   Edit, 
@@ -68,7 +69,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { formatCurrency, cn } from "@/lib/utils";
-import type { Equipment, Assembly, AssemblyItem } from "@/app/admin/inventory/page";
+import type { Equipment, Assembly, AssemblyItem } from "@/components/inventory/inventory-layout";
 import { EquipmentCombobox } from "@/components/assembly/equipment-combobox";
 
 interface AssembliesTableProps {
@@ -97,6 +98,10 @@ interface AssemblyType {
   name: string;
   description: string | null;
   categoryId: string;
+  category: {
+    id: string;
+    name: string;
+  };
   _count: { assemblies: number };
 }
 
@@ -331,10 +336,6 @@ export function AssembliesTable({
     fetchStructuredData();
   }, []);
 
-  // Filter types by selected category
-  const filteredTypes = formData.categoryId
-    ? structuredTypes.filter((t) => t.categoryId === formData.categoryId)
-    : structuredTypes;
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows);
@@ -677,54 +678,20 @@ export function AssembliesTable({
                     </Select>
                   </div>
                   
-                  {/* Structured Category and Type */}
-                  {structuredCategories.length > 0 && (
-                    <div className="grid gap-4 p-3 bg-muted/30 rounded-lg border">
-                      <div className="grid gap-2">
-                        <Label htmlFor="categoryId">Category</Label>
-                        <Select
-                          value={formData.categoryId}
-                          onValueChange={(value) => setFormData({ 
-                            ...formData, 
-                            categoryId: value,
-                            typeId: "", // Reset type when category changes
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a category..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">None</SelectItem>
-                            {structuredCategories.map((cat) => (
-                              <SelectItem key={cat.id} value={cat.id}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      {formData.categoryId && filteredTypes.length > 0 && (
-                        <div className="grid gap-2">
-                          <Label htmlFor="typeId">Type</Label>
-                          <Select
-                            value={formData.typeId}
-                            onValueChange={(value) => setFormData({ ...formData, typeId: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a type..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">None</SelectItem>
-                              {filteredTypes.map((t) => (
-                                <SelectItem key={t.id} value={t.id}>
-                                  {t.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
+                  {/* Assembly Type */}
+                  {structuredTypes.length > 0 && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="typeId">Assembly Type</Label>
+                      <GroupedTypeSelect
+                        value={formData.typeId || null}
+                        onChange={(typeId, categoryId) => setFormData({
+                          ...formData,
+                          typeId: typeId || "",
+                          categoryId: categoryId || "",
+                        })}
+                        types={structuredTypes}
+                        placeholder="Select assembly type..."
+                      />
                     </div>
                   )}
                   

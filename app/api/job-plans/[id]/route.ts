@@ -12,7 +12,103 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/job-plans/[id] - Get a single job plan with full details
+// Define include configurations for selective loading
+// This reduces payload sizes when only basic info is needed
+const INCLUDE_CONFIGS = {
+  // Basic info - always included (creator, assignments, project area)
+  basic: {
+    createdBy: {
+      select: { id: true, name: true, email: true },
+    },
+    assignments: {
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        assignedBy: { select: { id: true, name: true } },
+      },
+    },
+    projectArea: {
+      select: { id: true, name: true, prefix: true },
+    },
+  },
+  // Permits with documents
+  permits: {
+    permits: {
+      include: {
+        permitType: true,
+        documents: {
+          include: {
+            uploadedBy: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { uploadedAt: "desc" as const },
+        },
+      },
+      orderBy: { createdAt: "asc" as const },
+    },
+  },
+  // Construction prints
+  prints: {
+    constructionPrints: {
+      orderBy: { uploadedAt: "desc" as const },
+    },
+  },
+  // Comments with replies
+  comments: {
+    comments: {
+      where: { parentId: null },
+      include: {
+        author: { select: { id: true, name: true, email: true } },
+        replies: {
+          include: {
+            author: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { createdAt: "asc" as const },
+        },
+      },
+      orderBy: { createdAt: "desc" as const },
+    },
+  },
+  // Required assemblies with equipment
+  assemblies: {
+    requiredAssemblies: {
+      include: {
+        assembly: {
+          include: {
+            type: { select: { id: true, name: true } },
+            category: { select: { id: true, name: true } },
+            items: {
+              include: {
+                equipment: {
+                  select: {
+                    id: true,
+                    name: true,
+                    sku: true,
+                    pricePerUnit: true,
+                    unitType: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" as const },
+    },
+  },
+  // Red light documents
+  redlight: {
+    redLightDocuments: {
+      include: {
+        uploadedBy: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { uploadedAt: "desc" as const },
+    },
+  },
+} as const;
+
+// GET /api/job-plans/[id] - Get a single job plan with configurable includes
+// Query params:
+//   ?include=basic,permits,comments - Comma-separated list of include sets
+//   ?include=all - Include everything (default for backwards compatibility)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -24,134 +120,40 @@ export async function GET(
     }
 
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const includeParam = searchParams.get("include") || "all";
+
+    // Build include object based on requested includes
+    let include: Record<string, unknown>;
+    
+    if (includeParam === "all") {
+      // Include everything for backwards compatibility
+      include = {
+        ...INCLUDE_CONFIGS.basic,
+        ...INCLUDE_CONFIGS.permits,
+        ...INCLUDE_CONFIGS.prints,
+        ...INCLUDE_CONFIGS.comments,
+        ...INCLUDE_CONFIGS.assemblies,
+        ...INCLUDE_CONFIGS.redlight,
+      };
+    } else {
+      // Parse requested includes
+      const requestedIncludes = includeParam.split(",").map(s => s.trim()).filter(Boolean);
+      
+      // Always include basic
+      include = { ...INCLUDE_CONFIGS.basic };
+      
+      // Add requested includes
+      for (const key of requestedIncludes) {
+        if (key !== "basic" && key in INCLUDE_CONFIGS) {
+          Object.assign(include, INCLUDE_CONFIGS[key as keyof typeof INCLUDE_CONFIGS]);
+        }
+      }
+    }
 
     const jobPlan = await prisma.jobPlan.findUnique({
       where: { id },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        assignments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            assignedBy: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        permits: {
-          include: {
-            permitType: true,
-            documents: {
-              include: {
-                uploadedBy: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                  },
-                },
-              },
-              orderBy: { uploadedAt: "desc" },
-            },
-          },
-          orderBy: { createdAt: "asc" },
-        },
-        constructionPrints: {
-          orderBy: { uploadedAt: "desc" },
-        },
-        projectArea: {
-          select: {
-            id: true,
-            name: true,
-            prefix: true,
-          },
-        },
-        comments: {
-          where: { parentId: null }, // Only top-level comments
-          include: {
-            author: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-            replies: {
-              include: {
-                author: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                  },
-                },
-              },
-              orderBy: { createdAt: "asc" },
-            },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-        requiredAssemblies: {
-          include: {
-            assembly: {
-              include: {
-                type: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-                category: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-                items: {
-                  include: {
-                    equipment: {
-                      select: {
-                        id: true,
-                        name: true,
-                        sku: true,
-                        pricePerUnit: true,
-                        unitType: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { createdAt: "asc" },
-        },
-        redLightDocuments: {
-          include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: { uploadedAt: "desc" },
-        },
-      },
+      include,
     });
 
     if (!jobPlan) {

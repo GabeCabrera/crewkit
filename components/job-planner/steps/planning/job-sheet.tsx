@@ -6,12 +6,20 @@ import {
   Printer,
   Package,
   CheckSquare,
+  Download,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobPlanData } from "../../job-lifecycle-view";
 
+type JobSheetMode = "planning" | "as-built";
+
 interface JobSheetProps {
   job: JobPlanData;
+  mode?: JobSheetMode;
 }
 
 // Format number with commas
@@ -95,7 +103,39 @@ function getBuildTypeLabel(buildType: string): string {
   return labels[buildType] || buildType;
 }
 
-export function JobSheet({ job }: JobSheetProps) {
+// Calculate variance and status
+interface VarianceResult {
+  variance: number;
+  percentVariance: number;
+  status: "match" | "over" | "under";
+}
+
+function calculateVariance(planned: number, actual: number, tolerancePercent: number = 10): VarianceResult {
+  const variance = actual - planned;
+  const percentVariance = planned > 0 ? ((actual / planned) * 100) - 100 : 0;
+  
+  let status: "match" | "over" | "under" = "match";
+  if (Math.abs(percentVariance) > tolerancePercent) {
+    status = variance > 0 ? "over" : "under";
+  }
+  
+  return { variance, percentVariance, status };
+}
+
+// Variance display helpers
+function getVarianceColor(status: "match" | "over" | "under"): string {
+  if (status === "over") return "text-red-600";
+  if (status === "under") return "text-emerald-600";
+  return "text-slate-600";
+}
+
+function getVarianceBgColor(status: "match" | "over" | "under"): string {
+  if (status === "over") return "bg-red-50";
+  if (status === "under") return "bg-emerald-50";
+  return "bg-slate-50";
+}
+
+export function JobSheet({ job, mode = "planning" }: JobSheetProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
   // Calculate totals
@@ -113,6 +153,20 @@ export function JobSheet({ job }: JobSheetProps) {
     [job.requiredAssemblies]
   );
 
+  // Calculate progress percentage for as-built mode
+  const progressPercentage = job.totalDistance > 0 
+    ? Math.min((job.actualFootage / job.totalDistance) * 100, 100) 
+    : 0;
+
+  // Calculate variances for as-built mode
+  const footageVariance = calculateVariance(job.totalDistance, job.actualFootage);
+  const strandVariance = calculateVariance(job.strandFootage, job.actualStrandUsed);
+  const fiberVariance = calculateVariance(job.fiberFootage, job.actualFiberUsed);
+  const deadEndsVariance = calculateVariance(job.deadEnds, job.actualDeadEnds, 20);
+  const tangentsVariance = calculateVariance(job.tangents, job.actualTangents, 20);
+  const anchorsVariance = calculateVariance(job.anchors, job.actualAnchors, 20);
+  const polesVariance = calculateVariance(job.poleCount, job.actualPolesComplete, 20);
+
   // Handle print
   const handlePrint = () => {
     window.print();
@@ -125,6 +179,8 @@ export function JobSheet({ job }: JobSheetProps) {
     year: "2-digit",
   });
 
+  const isAsBuilt = mode === "as-built";
+
   // Hazard flags
   const hazards = [];
   if (job.trafficControl) hazards.push("Traffic");
@@ -135,10 +191,30 @@ export function JobSheet({ job }: JobSheetProps) {
   return (
     <div>
       {/* Print Controls - Hidden when printing */}
-      <div className="print:hidden flex items-center justify-between p-2 mb-3 bg-slate-50 border border-slate-200 rounded-lg">
+      <div className={cn(
+        "print:hidden flex items-center justify-between p-2 mb-3 border rounded-lg",
+        isAsBuilt ? "bg-blue-50 border-blue-200" : "bg-slate-50 border-slate-200"
+      )}>
         <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-slate-500" />
-          <span className="text-sm font-medium text-slate-700">Job Prep Sheet</span>
+          {isAsBuilt ? (
+            <FileText className="h-4 w-4 text-blue-500" />
+          ) : (
+            <Package className="h-4 w-4 text-slate-500" />
+          )}
+          <span className={cn(
+            "text-sm font-medium",
+            isAsBuilt ? "text-blue-700" : "text-slate-700"
+          )}>
+            {isAsBuilt ? "As-Built Report" : "Job Prep Sheet"}
+          </span>
+          {isAsBuilt && (
+            <span className={cn(
+              "px-2 py-0.5 rounded text-xs font-medium",
+              job.foremanSignoff ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+            )}>
+              {job.foremanSignoff ? "FINAL" : "DRAFT"}
+            </span>
+          )}
         </div>
         <Button onClick={handlePrint} size="sm" className="gap-2 h-8">
           <Printer className="h-3.5 w-3.5" />
@@ -158,7 +234,10 @@ export function JobSheet({ job }: JobSheetProps) {
         `}</style>
 
         {/* HEADER ROW */}
-        <div className="flex items-start justify-between pb-2 mb-2 border-b-2 border-slate-800">
+        <div className={cn(
+          "flex items-start justify-between pb-2 mb-2 border-b-2",
+          isAsBuilt ? "border-blue-800" : "border-slate-800"
+        )}>
           <div>
             <h1 className="text-lg font-bold text-slate-900 leading-tight">{job.jobName}</h1>
             <div className="flex items-center gap-3 text-slate-600 mt-0.5">
@@ -167,10 +246,41 @@ export function JobSheet({ job }: JobSheetProps) {
             </div>
           </div>
           <div className="text-right text-[10px] text-slate-500">
-            <div className="font-semibold text-slate-700">JOB PREP SHEET</div>
+            <div className={cn(
+              "font-semibold",
+              isAsBuilt ? "text-blue-700" : "text-slate-700"
+            )}>
+              {isAsBuilt ? "AS-BUILT REPORT" : "JOB PREP SHEET"}
+              {isAsBuilt && !job.foremanSignoff && <span className="ml-1 text-amber-600">(DRAFT)</span>}
+            </div>
             <div>{printDate}</div>
           </div>
         </div>
+
+        {/* Progress Bar - As-Built Mode Only */}
+        {isAsBuilt && (
+          <div className="mb-3 p-2 bg-slate-100 rounded">
+            <div className="flex items-center justify-between mb-1 text-[10px]">
+              <span className="font-semibold text-slate-700">Overall Progress</span>
+              <span className="font-bold text-slate-900">{progressPercentage.toFixed(0)}%</span>
+            </div>
+            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full transition-all duration-500",
+                  progressPercentage >= 100 
+                    ? "bg-emerald-500" 
+                    : "bg-blue-500"
+                )}
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-1 text-[9px] text-slate-500">
+              <span>{formatNumber(job.actualFootage)} ft completed</span>
+              <span>{formatNumber(job.totalDistance)} ft planned</span>
+            </div>
+          </div>
+        )}
 
         {/* TWO COLUMN LAYOUT */}
         <div className="grid grid-cols-2 gap-3">
@@ -188,21 +298,95 @@ export function JobSheet({ job }: JobSheetProps) {
               )}
             </div>
 
-            {/* Cable Requirements - Inline */}
-            <div className="p-2 border border-slate-200 rounded">
-              <div className="font-semibold text-slate-700 mb-1">Cable</div>
-              <div className="grid grid-cols-3 gap-1 text-[10px]">
-                <div className="flex justify-between"><span className="text-slate-500">Aerial</span><span className="font-mono font-semibold">{formatNumber(job.aerialFootage)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">UG</span><span className="font-mono font-semibold">{formatNumber(job.undergroundFootage)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Slack</span><span className="font-mono font-semibold">{formatNumber(job.slackLoopFootage)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Strand</span><span className="font-mono font-semibold">{formatNumber(job.strandFootage)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Fiber</span><span className="font-mono font-semibold">{formatNumber(job.fiberFootage)}</span></div>
-                <div className="flex justify-between bg-slate-100 px-1 rounded"><span className="font-semibold">Total</span><span className="font-mono font-bold">{formatNumber(totalCable)}</span></div>
+            {/* Cable Requirements - Different layout for as-built */}
+            {isAsBuilt ? (
+              <div className="p-2 border border-slate-200 rounded">
+                <div className="font-semibold text-slate-700 mb-1">Materials Comparison</div>
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="text-slate-500 border-b border-slate-100">
+                      <th className="text-left py-1">Item</th>
+                      <th className="text-right py-1">Planned</th>
+                      <th className="text-right py-1">Actual</th>
+                      <th className="text-right py-1">Var</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className={getVarianceBgColor(footageVariance.status)}>
+                      <td className="py-0.5 font-medium">Total Footage</td>
+                      <td className="text-right font-mono">{formatNumber(job.totalDistance)}</td>
+                      <td className="text-right font-mono font-semibold">{formatNumber(job.actualFootage)}</td>
+                      <td className={cn("text-right font-mono font-semibold", getVarianceColor(footageVariance.status))}>
+                        {footageVariance.variance >= 0 ? "+" : ""}{formatNumber(footageVariance.variance)}
+                      </td>
+                    </tr>
+                    <tr className={getVarianceBgColor(strandVariance.status)}>
+                      <td className="py-0.5 font-medium">Strand</td>
+                      <td className="text-right font-mono">{formatNumber(job.strandFootage)}</td>
+                      <td className="text-right font-mono font-semibold">{formatNumber(job.actualStrandUsed)}</td>
+                      <td className={cn("text-right font-mono font-semibold", getVarianceColor(strandVariance.status))}>
+                        {strandVariance.variance >= 0 ? "+" : ""}{formatNumber(strandVariance.variance)}
+                      </td>
+                    </tr>
+                    <tr className={getVarianceBgColor(fiberVariance.status)}>
+                      <td className="py-0.5 font-medium">Fiber</td>
+                      <td className="text-right font-mono">{formatNumber(job.fiberFootage)}</td>
+                      <td className="text-right font-mono font-semibold">{formatNumber(job.actualFiberUsed)}</td>
+                      <td className={cn("text-right font-mono font-semibold", getVarianceColor(fiberVariance.status))}>
+                        {fiberVariance.variance >= 0 ? "+" : ""}{formatNumber(fiberVariance.variance)}
+                      </td>
+                    </tr>
+                    <tr className={getVarianceBgColor(deadEndsVariance.status)}>
+                      <td className="py-0.5 font-medium">Dead-ends</td>
+                      <td className="text-right font-mono">{job.deadEnds}</td>
+                      <td className="text-right font-mono font-semibold">{job.actualDeadEnds}</td>
+                      <td className={cn("text-right font-mono font-semibold", getVarianceColor(deadEndsVariance.status))}>
+                        {deadEndsVariance.variance >= 0 ? "+" : ""}{deadEndsVariance.variance}
+                      </td>
+                    </tr>
+                    <tr className={getVarianceBgColor(tangentsVariance.status)}>
+                      <td className="py-0.5 font-medium">Tangents</td>
+                      <td className="text-right font-mono">{job.tangents}</td>
+                      <td className="text-right font-mono font-semibold">{job.actualTangents}</td>
+                      <td className={cn("text-right font-mono font-semibold", getVarianceColor(tangentsVariance.status))}>
+                        {tangentsVariance.variance >= 0 ? "+" : ""}{tangentsVariance.variance}
+                      </td>
+                    </tr>
+                    <tr className={getVarianceBgColor(anchorsVariance.status)}>
+                      <td className="py-0.5 font-medium">Anchors</td>
+                      <td className="text-right font-mono">{job.anchors}</td>
+                      <td className="text-right font-mono font-semibold">{job.actualAnchors}</td>
+                      <td className={cn("text-right font-mono font-semibold", getVarianceColor(anchorsVariance.status))}>
+                        {anchorsVariance.variance >= 0 ? "+" : ""}{anchorsVariance.variance}
+                      </td>
+                    </tr>
+                    <tr className={getVarianceBgColor(polesVariance.status)}>
+                      <td className="py-0.5 font-medium">Poles</td>
+                      <td className="text-right font-mono">{job.poleCount}</td>
+                      <td className="text-right font-mono font-semibold">{job.actualPolesComplete}</td>
+                      <td className={cn("text-right font-mono font-semibold", getVarianceColor(polesVariance.status))}>
+                        {polesVariance.variance >= 0 ? "+" : ""}{polesVariance.variance}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </div>
+            ) : (
+              <div className="p-2 border border-slate-200 rounded">
+                <div className="font-semibold text-slate-700 mb-1">Cable</div>
+                <div className="grid grid-cols-3 gap-1 text-[10px]">
+                  <div className="flex justify-between"><span className="text-slate-500">Aerial</span><span className="font-mono font-semibold">{formatNumber(job.aerialFootage)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">UG</span><span className="font-mono font-semibold">{formatNumber(job.undergroundFootage)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Slack</span><span className="font-mono font-semibold">{formatNumber(job.slackLoopFootage)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Strand</span><span className="font-mono font-semibold">{formatNumber(job.strandFootage)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Fiber</span><span className="font-mono font-semibold">{formatNumber(job.fiberFootage)}</span></div>
+                  <div className="flex justify-between bg-slate-100 px-1 rounded"><span className="font-semibold">Total</span><span className="font-mono font-bold">{formatNumber(totalCable)}</span></div>
+                </div>
+              </div>
+            )}
 
-            {/* Infrastructure - Inline badges */}
-            {Object.keys(infraCounts).length > 0 && (
+            {/* Infrastructure - Inline badges (planning mode only) */}
+            {!isAsBuilt && Object.keys(infraCounts).length > 0 && (
               <div className="p-2 border border-slate-200 rounded">
                 <div className="font-semibold text-slate-700 mb-1">Infrastructure</div>
                 <div className="flex flex-wrap gap-1">
@@ -230,6 +414,27 @@ export function JobSheet({ job }: JobSheetProps) {
                       <span className="text-slate-600">Anchors</span>
                     </span>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Crew Hours Summary - As-Built mode only */}
+            {isAsBuilt && job.totalCrewHours > 0 && (
+              <div className="p-2 border border-blue-200 bg-blue-50 rounded">
+                <div className="font-semibold text-blue-700 mb-1">Crew Hours</div>
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="bg-white rounded p-2 text-center">
+                    <div className="text-lg font-bold text-blue-700">{job.totalCrewHours.toFixed(1)}</div>
+                    <div className="text-slate-500">Total Hours</div>
+                  </div>
+                  <div className="bg-white rounded p-2 text-center">
+                    <div className="text-lg font-bold text-blue-700">
+                      {job.actualFootage > 0 && job.totalCrewHours > 0 
+                        ? (job.actualFootage / job.totalCrewHours).toFixed(0) 
+                        : "—"}
+                    </div>
+                    <div className="text-slate-500">Ft / Hour</div>
+                  </div>
                 </div>
               </div>
             )}
@@ -334,17 +539,39 @@ export function JobSheet({ job }: JobSheetProps) {
         </div>
 
         {/* Signature Line - Print only */}
-        <div className="hidden print:flex mt-4 pt-3 border-t border-slate-300 justify-between text-[9px] text-slate-500">
-          <div className="flex-1">
-            <span>Prepared: _______________________</span>
+        {isAsBuilt ? (
+          <div className="hidden print:block mt-4 pt-3 border-t border-slate-300">
+            {job.foremanSignoff ? (
+              <div className="text-[9px] text-emerald-700 text-center">
+                <span className="font-semibold">SIGNED OFF</span>
+                {job.signoffDate && (
+                  <span> on {new Date(job.signoffDate).toLocaleDateString()}</span>
+                )}
+              </div>
+            ) : (
+              <div className="flex justify-between text-[9px] text-slate-500">
+                <div className="flex-1">
+                  <span>Foreman Sign-off: _______________________</span>
+                </div>
+                <div className="flex-1 text-right">
+                  <span>Date: _______________</span>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex-1 text-center">
-            <span>Verified: _______________________</span>
+        ) : (
+          <div className="hidden print:flex mt-4 pt-3 border-t border-slate-300 justify-between text-[9px] text-slate-500">
+            <div className="flex-1">
+              <span>Prepared: _______________________</span>
+            </div>
+            <div className="flex-1 text-center">
+              <span>Verified: _______________________</span>
+            </div>
+            <div className="flex-1 text-right">
+              <span>Date: _______________</span>
+            </div>
           </div>
-          <div className="flex-1 text-right">
-            <span>Date: _______________</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

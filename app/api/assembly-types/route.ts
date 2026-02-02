@@ -44,6 +44,68 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// PUT /api/assembly-types - Bulk reorder types
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (!user || !["SUPERUSER", "ADMIN"].includes(user.role)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { items } = body;
+
+    if (!Array.isArray(items)) {
+      return NextResponse.json({ error: "Items array is required" }, { status: 400 });
+    }
+
+    // Update all types with their new order
+    await prisma.$transaction(
+      items.map((item: { id: string; order: number }) =>
+        prisma.assemblyType.update({
+          where: { id: item.id },
+          data: { order: item.order },
+        })
+      )
+    );
+
+    // Return updated types
+    const types = await prisma.assemblyType.findMany({
+      orderBy: [{ order: "asc" }, { name: "asc" }],
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            assemblies: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(types);
+  } catch (error) {
+    console.error("Error reordering assembly types:", error);
+    return NextResponse.json(
+      { error: "Failed to reorder types" },
+      { status: 500 }
+    );
+  }
+}
+
 // POST /api/assembly-types - Create a new type
 export async function POST(request: NextRequest) {
   try {

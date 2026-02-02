@@ -58,15 +58,13 @@ function FieldJobsPageContent() {
         />
       </div>
 
-      {/* Job Detail Panel */}
-      {selectedJobId && (
-        <JobDetailPanel
-          jobId={selectedJobId}
-          onClose={handleCloseDetail}
-          onUpdate={handleJobUpdated}
-          basePath="/field/jobs"
-        />
-      )}
+      {/* Job Detail Panel - Sheet handles open/close state */}
+      <JobDetailPanel
+        jobId={selectedJobId}
+        onClose={handleCloseDetail}
+        onUpdate={handleJobUpdated}
+        basePath="/field/jobs"
+      />
     </div>
   );
 }

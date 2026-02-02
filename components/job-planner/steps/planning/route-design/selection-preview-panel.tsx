@@ -57,40 +57,71 @@ function formatNumber(num: number): string {
 
 // Available assembly types for override dropdown
 const ASSEMBLY_TYPE_OPTIONS: AssemblyType[] = [
-  "Terminal Pole",
-  "Tangent Pole",
-  "Corner Pole",
-  "Junction Pole",
-  "Intermediate Pole",
-  "Splice Case",
-  "MST",
-  "Riser",
-  "Vault",
-  "Handhole",
-  "Pedestal",
-  "Guy/Anchor",
-  "Crossing",
-  "Slack Loop",
+  // Strand
+  "strand.terminal",
+  "strand.tangent",
+  "strand.corner",
+  "strand.junction",
+  // Fiber
+  "fiber.terminal",
+  "fiber.tangent",
+  "fiber.corner",
+  "fiber.junction",
+  "fiber.splice",
+  "fiber.slack",
+  // Underground
+  "underground.riser",
+  "underground.vault",
+  "underground.handhole",
+  // Service
+  "service.mst",
+  "service.mst2",
+  "service.mst6",
+  "service.mst8",
+  "service.pedestal",
+  // Hardware
+  "hardware.anchor",
+  "hardware.crossing",
 ];
+
+// Get display name for assembly type slug
+function getAssemblyDisplayName(slug: AssemblyType): string {
+  const names: Record<AssemblyType, string> = {
+    "strand.terminal": "Terminal Pole",
+    "strand.tangent": "Tangent Pole",
+    "strand.corner": "Corner Pole",
+    "strand.junction": "Junction Pole",
+    "fiber.terminal": "Fiber Terminal",
+    "fiber.tangent": "Fiber Tangent",
+    "fiber.corner": "Fiber Corner",
+    "fiber.junction": "Fiber Junction",
+    "fiber.splice": "Splice Case",
+    "fiber.slack": "Slack Loop",
+    "underground.vault": "Vault",
+    "underground.handhole": "Handhole",
+    "underground.riser": "Riser",
+    "service.mst": "MST",
+    "service.mst2": "MST 2-Port",
+    "service.mst6": "MST 6-Port",
+    "service.mst8": "MST 8-Port",
+    "service.pedestal": "Pedestal",
+    "hardware.anchor": "Guy/Anchor",
+    "hardware.crossing": "Crossing",
+    "unknown": "Unknown",
+  };
+  return names[slug] || slug;
+}
 
 // Get icon for assembly type
 function getAssemblyIcon(type: AssemblyType) {
-  switch (type) {
-    case "Terminal Pole":
-    case "Tangent Pole":
-    case "Corner Pole":
-    case "Junction Pole":
-    case "Intermediate Pole":
-      return Milestone;
-    case "Splice Case":
-      return Zap;
-    case "MST":
-      return Box;
-    case "Riser":
-      return ArrowDown;
-    default:
-      return Box;
+  if (type.startsWith("strand.")) return Milestone;
+  if (type.startsWith("fiber.")) {
+    if (type === "fiber.splice") return Zap;
+    return Milestone;
   }
+  if (type === "underground.riser") return ArrowDown;
+  if (type.startsWith("service.")) return Box;
+  return Box;
 }
 
 export function SelectionPreviewPanel({
@@ -241,11 +272,10 @@ export function SelectionPreviewPanel({
           
           <div className="space-y-2">
             {/* Poles Summary */}
-            {(assemblyCounts["Terminal Pole"] > 0 || 
-              assemblyCounts["Tangent Pole"] > 0 || 
-              assemblyCounts["Corner Pole"] > 0 || 
-              assemblyCounts["Junction Pole"] > 0 ||
-              assemblyCounts["Intermediate Pole"] > 0) && (
+            {(assemblyCounts["strand.terminal"] > 0 || 
+              assemblyCounts["strand.tangent"] > 0 || 
+              assemblyCounts["strand.corner"] > 0 || 
+              assemblyCounts["strand.junction"] > 0) && (
               <div className="p-3 bg-slate-50 rounded-lg space-y-2">
                 <div className="flex items-center gap-2">
                   <Milestone className="h-4 w-4 text-slate-600" />
@@ -254,34 +284,28 @@ export function SelectionPreviewPanel({
                   </span>
                 </div>
                 <div className="pl-6 space-y-1">
-                  {assemblyCounts["Terminal Pole"] > 0 && (
+                  {assemblyCounts["strand.terminal"] > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Terminal</span>
-                      <span className="font-medium text-slate-800">{assemblyCounts["Terminal Pole"]}</span>
+                      <span className="font-medium text-slate-800">{assemblyCounts["strand.terminal"]}</span>
                     </div>
                   )}
-                  {assemblyCounts["Tangent Pole"] > 0 && (
+                  {assemblyCounts["strand.tangent"] > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Tangent</span>
-                      <span className="font-medium text-slate-800">{assemblyCounts["Tangent Pole"]}</span>
+                      <span className="font-medium text-slate-800">{assemblyCounts["strand.tangent"]}</span>
                     </div>
                   )}
-                  {assemblyCounts["Corner Pole"] > 0 && (
+                  {assemblyCounts["strand.corner"] > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Corner</span>
-                      <span className="font-medium text-slate-800">{assemblyCounts["Corner Pole"]}</span>
+                      <span className="font-medium text-slate-800">{assemblyCounts["strand.corner"]}</span>
                     </div>
                   )}
-                  {assemblyCounts["Junction Pole"] > 0 && (
+                  {assemblyCounts["strand.junction"] > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-600">Junction</span>
-                      <span className="font-medium text-slate-800">{assemblyCounts["Junction Pole"]}</span>
-                    </div>
-                  )}
-                  {assemblyCounts["Intermediate Pole"] > 0 && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Intermediate</span>
-                      <span className="font-medium text-slate-800">{assemblyCounts["Intermediate Pole"]}</span>
+                      <span className="font-medium text-slate-800">{assemblyCounts["strand.junction"]}</span>
                     </div>
                   )}
                 </div>
@@ -290,7 +314,7 @@ export function SelectionPreviewPanel({
             
             {/* Other Infrastructure */}
             {Object.entries(assemblyCounts)
-              .filter(([type, count]) => count > 0 && !type.includes("Pole"))
+              .filter(([type, count]) => count > 0 && !type.startsWith("strand."))
               .map(([type, count]) => (
                 <div key={type} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-2">

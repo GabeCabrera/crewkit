@@ -737,21 +737,21 @@ export function RouteDesignStep({ job, updateJob, refreshJob, canEdit }: RouteDe
     let anchors = 0;
     
     for (const item of assemblyCounts) {
-      if (item.assemblyType === "Terminal Pole") {
+      if (item.assemblyType === "strand.terminal") {
         deadEnds += item.quantity;
-      } else if (item.assemblyType === "Tangent Pole" || item.assemblyType === "Intermediate Pole") {
+      } else if (item.assemblyType === "strand.tangent") {
         tangents += item.quantity;
-      } else if (item.assemblyType === "Corner Pole" || item.assemblyType === "Junction Pole") {
+      } else if (item.assemblyType === "strand.corner" || item.assemblyType === "strand.junction") {
         // Corner and junction poles typically need anchors
         anchors += item.quantity;
-      } else if (item.assemblyType === "Guy/Anchor") {
+      } else if (item.assemblyType === "hardware.anchor") {
         anchors += item.quantity;
       }
     }
     
     // Calculate filtered pole count
     const filteredPoleCount = filteredAssemblies.filter(a => 
-      ["Terminal Pole", "Tangent Pole", "Corner Pole", "Junction Pole", "Intermediate Pole"].includes(
+      ["strand.terminal", "strand.tangent", "strand.corner", "strand.junction"].includes(
         a.userOverride || a.detectedAssemblyType
       )
     ).length;

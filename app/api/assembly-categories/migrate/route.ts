@@ -95,19 +95,23 @@ export async function POST(request: NextRequest) {
 
     // 3. Optionally create types based on assembly name patterns
     const typePatterns = [
-      { pattern: /terminal/i, type: "Terminal Pole" },
-      { pattern: /intermediate/i, type: "Intermediate Pole" },
-      { pattern: /snowshoe/i, type: "Snowshoe" },
-      { pattern: /anchor/i, type: "Anchor" },
-      { pattern: /riser/i, type: "Riser" },
-      { pattern: /splice/i, type: "Splice Case" },
-      { pattern: /handhole/i, type: "Handhole" },
-      { pattern: /vault/i, type: "Vault" },
-      { pattern: /mst/i, type: "MST" },
-      { pattern: /drop/i, type: "Drop" },
+      { pattern: /terminal/i, slug: "strand.terminal", name: "Strand: Terminal Pole" },
+      { pattern: /tangent/i, slug: "strand.tangent", name: "Strand: Tangent Pole" },
+      { pattern: /corner/i, slug: "strand.corner", name: "Strand: Corner Pole" },
+      { pattern: /junction/i, slug: "strand.junction", name: "Strand: Junction Pole" },
+      { pattern: /anchor|guy/i, slug: "hardware.anchor", name: "Hardware: Guy/Anchor" },
+      { pattern: /riser/i, slug: "underground.riser", name: "Underground: Riser" },
+      { pattern: /splice/i, slug: "fiber.splice", name: "Fiber: Splice Case" },
+      { pattern: /handhole/i, slug: "underground.handhole", name: "Underground: Handhole" },
+      { pattern: /vault/i, slug: "underground.vault", name: "Underground: Vault" },
+      { pattern: /mst.*2/i, slug: "service.mst2", name: "Service: MST 2-Port" },
+      { pattern: /mst.*6/i, slug: "service.mst6", name: "Service: MST 6-Port" },
+      { pattern: /mst/i, slug: "service.mst", name: "Service: MST" },
+      { pattern: /slack/i, slug: "fiber.slack", name: "Fiber: Slack Loop" },
     ];
 
-    const typeMap = new Map<string, Map<string, string>>(); // categoryId -> (typeName -> typeId)
+    const typeMap = new Map<string, Map<string, string>>(); // categoryId -> (slug -> typeId)
+    const slugToTypeMap = new Map<string, string>(); // slug -> typeId (global lookup)
 
     // Get existing types
     const existingTypes = await prisma.assemblyType.findMany();
@@ -115,7 +119,12 @@ export async function POST(request: NextRequest) {
       if (!typeMap.has(t.categoryId)) {
         typeMap.set(t.categoryId, new Map());
       }
-      typeMap.get(t.categoryId)!.set(t.name.toLowerCase(), t.id);
+      // Use slug for lookup if available, otherwise fall back to name
+      const key = (t as any).slug || t.name.toLowerCase();
+      typeMap.get(t.categoryId)!.set(key, t.id);
+      if ((t as any).slug) {
+        slugToTypeMap.set((t as any).slug, t.id);
+      }
     });
 
     if (createTypes) {
@@ -128,11 +137,13 @@ export async function POST(request: NextRequest) {
           a.categories.some((c) => c.toLowerCase() === catName)
         );
 
-        const typesToCreate = new Set<string>();
+        const typesToCreate: { slug: string; name: string }[] = [];
         categoryAssemblies.forEach((a) => {
-          for (const { pattern, type } of typePatterns) {
+          for (const { pattern, slug, name } of typePatterns) {
             if (pattern.test(a.name)) {
-              typesToCreate.add(type);
+              if (!typesToCreate.find(t => t.slug === slug)) {
+                typesToCreate.push({ slug, name });
+              }
               break;
             }
           }
@@ -143,25 +154,26 @@ export async function POST(request: NextRequest) {
           typeMap.set(resolvedCatId, new Map());
         }
 
-        for (const typeName of Array.from(typesToCreate)) {
-          const normalizedType = typeName.toLowerCase();
-          if (!typeMap.get(resolvedCatId)!.has(normalizedType)) {
+        for (const typeInfo of typesToCreate) {
+          if (!typeMap.get(resolvedCatId)!.has(typeInfo.slug) && !slugToTypeMap.has(typeInfo.slug)) {
             if (!dryRun) {
               try {
                 const newType = await prisma.assemblyType.create({
                   data: {
-                    name: typeName,
+                    slug: typeInfo.slug,
+                    name: typeInfo.name,
                     categoryId: catId,
                     order: typeMap.get(resolvedCatId)!.size,
                   },
                 });
-                typeMap.get(resolvedCatId)!.set(normalizedType, newType.id);
-                results.typesCreated.push({ name: typeName, category: catName });
+                typeMap.get(resolvedCatId)!.set(typeInfo.slug, newType.id);
+                slugToTypeMap.set(typeInfo.slug, newType.id);
+                results.typesCreated.push({ name: typeInfo.name, category: catName });
               } catch (error) {
-                results.errors.push(`Failed to create type "${typeName}" in "${catName}": ${error}`);
+                results.errors.push(`Failed to create type "${typeInfo.name}" in "${catName}": ${error}`);
               }
             } else {
-              results.typesCreated.push({ name: typeName, category: catName });
+              results.typesCreated.push({ name: typeInfo.name, category: catName });
             }
           }
         }
@@ -190,18 +202,26 @@ export async function POST(request: NextRequest) {
       let assignedTypeId: string | null = null;
       let assignedTypeName: string | null = null;
 
-      if (assignedCategoryId && createTypes) {
-        const categoryTypes = typeMap.get(assignedCategoryId);
-        if (categoryTypes) {
-          for (const { pattern, type } of typePatterns) {
-            if (pattern.test(assembly.name)) {
-              const typeId = categoryTypes.get(type.toLowerCase());
-              if (typeId) {
-                assignedTypeId = typeId;
-                assignedTypeName = type;
+      if (createTypes) {
+        for (const { pattern, slug, name } of typePatterns) {
+          if (pattern.test(assembly.name)) {
+            // First try global slug lookup
+            const typeId = slugToTypeMap.get(slug);
+            if (typeId) {
+              assignedTypeId = typeId;
+              assignedTypeName = name;
+            } else if (assignedCategoryId) {
+              // Fall back to category-specific lookup
+              const categoryTypes = typeMap.get(assignedCategoryId);
+              if (categoryTypes) {
+                const catTypeId = categoryTypes.get(slug);
+                if (catTypeId) {
+                  assignedTypeId = catTypeId;
+                  assignedTypeName = name;
+                }
               }
-              break;
             }
+            break;
           }
         }
       }

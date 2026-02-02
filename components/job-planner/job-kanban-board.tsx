@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { JobViewSwitcher, ViewMode } from "./job-view-switcher";
 import { JobCalendarView } from "./job-calendar-view";
+import { CombinedJobsView } from "./combined-jobs-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -227,8 +228,9 @@ export function JobKanbanBoard({
       // Map old values to new ones
       if (saved === "list") return "list";
       if (saved === "timeline" || saved === "calendar") return "calendar";
+      if (saved === "combined") return "combined";
     }
-    return "list"; // Default to list view
+    return "combined"; // Default to combined (split) view
   });
 
   // Persist view mode changes
@@ -250,7 +252,9 @@ export function JobKanbanBoard({
     queryFn: async () => {
       const response = await fetch("/api/job-plans");
       if (!response.ok) throw new Error("Failed to fetch jobs");
-      return response.json() as Promise<JobPlan[]>;
+      const data = await response.json();
+      // Handle paginated response format
+      return (data.jobPlans || data) as JobPlan[];
     },
     // Background refetch every 30 seconds for near-real-time updates
     refetchInterval: 30 * 1000,
@@ -607,7 +611,15 @@ export function JobKanbanBoard({
       )}
 
       {/* Conditional View Based on Mode */}
-      {viewMode === "calendar" ? (
+      {viewMode === "combined" ? (
+        <div className="flex-1 min-h-0">
+          <CombinedJobsView
+            jobs={filteredJobs}
+            onSelectJob={onSelectJob}
+            selectedJobId={selectedJobId}
+          />
+        </div>
+      ) : viewMode === "calendar" ? (
         <JobCalendarView
           jobs={filteredJobs}
           onSelectJob={onSelectJob}

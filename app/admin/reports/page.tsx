@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,8 +54,22 @@ import {
   Trash2,
   AlertTriangle,
   Loader2,
+  Map,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+
+// Dynamically import ProgressMap to avoid SSR issues with Mapbox
+const ProgressMap = dynamic(
+  () => import("@/components/job-planner/progress-map").then((mod) => mod.ProgressMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-[300px] bg-slate-100 rounded-lg">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    ),
+  }
+);
 
 // ==================== TYPES ====================
 interface FieldWorkLog {
@@ -84,6 +99,9 @@ interface FieldWorkLog {
   team: { id: string; name: string } | null;
   createdById: string | null;
   createdBy: { id: string; name: string | null; email: string } | null;
+  jobPlanId: string | null;
+  jobPlan: { id: string; jobName: string; jobNumber: string | null; locationName: string | null; status: string } | null;
+  syncedAt: string | null;
 }
 
 interface AssemblyUsageData {
@@ -801,6 +819,7 @@ function DailyLogsTab() {
                 <tr className="border-b text-left">
                   <th className="pb-3 font-medium text-muted-foreground">Date</th>
                   <th className="pb-3 font-medium text-muted-foreground">Location</th>
+                  <th className="pb-3 font-medium text-muted-foreground">Job</th>
                   <th className="pb-3 font-medium text-muted-foreground text-center">Crew</th>
                   <th className="pb-3 font-medium text-muted-foreground text-center">Hours</th>
                   <th className="pb-3 font-medium text-muted-foreground text-right">Strand</th>
@@ -816,6 +835,15 @@ function DailyLogsTab() {
                       {log.location}
                       {log.notes && <StickyNote className="inline h-3 w-3 ml-1 text-amber-500" />}
                       {log.issues && <AlertTriangle className="inline h-3 w-3 ml-1 text-red-500" />}
+                    </td>
+                    <td className="py-3 max-w-[140px]">
+                      {log.jobPlan ? (
+                        <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700 truncate max-w-full">
+                          {log.jobPlan.jobName}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </td>
                     <td className="py-3 text-center"><Badge variant="secondary" className="font-mono">{log.workerCount}</Badge></td>
                     <td className="py-3 text-center font-mono">{log.hoursWorked}h</td>
@@ -859,6 +887,24 @@ function DailyLogsTab() {
                 </div>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {/* Linked Job */}
+                {selectedLog.jobPlan && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-blue-700">
+                      <Layers className="h-4 w-4" />
+                      <span className="font-medium">Linked to Job: {selectedLog.jobPlan.jobName}</span>
+                    </div>
+                    {selectedLog.jobPlan.locationName && (
+                      <p className="text-sm text-blue-600 mt-1">{selectedLog.jobPlan.locationName}</p>
+                    )}
+                    {selectedLog.syncedAt && (
+                      <p className="text-xs text-blue-500 mt-1">
+                        Synced: {new Date(selectedLog.syncedAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Crew */}
                 <div>
                   <p className="text-xs font-medium text-muted-foreground mb-2">Crew ({selectedLog.workerCount} workers • {selectedLog.hoursWorked}h)</p>
@@ -1212,10 +1258,19 @@ function DailyLogsTab() {
 }
 
 // ==================== SUBMIT REPORT TAB ====================
+interface JobOption {
+  id: string;
+  jobName: string;
+  jobNumber: string | null;
+  locationName: string | null;
+  status: string;
+}
+
 function SubmitReportTab() {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     location: "",
+    jobPlanId: "",
     workers: [] as string[],
     workerInput: "",
     hoursWorked: "",
@@ -1234,9 +1289,62 @@ function SubmitReportTab() {
     plowedFootage: "",
     notes: "",
     issues: "",
+    completedInfraIds: [] as string[],
+    completedFiberIds: [] as string[],
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [jobs, setJobs] = useState<JobOption[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [showProgressMap, setShowProgressMap] = useState(false);
+
+  // Fetch active jobs for the selector
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const response = await fetch("/api/job-plans?status=READY,IN_PROGRESS&limit=100");
+        if (response.ok) {
+          const data = await response.json();
+          setJobs(data.jobPlans || []);
+        }
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+      } finally {
+        setLoadingJobs(false);
+      }
+    };
+    fetchJobs();
+  }, []);
+
+  // Auto-fill location when job is selected
+  const handleJobSelect = (jobId: string) => {
+    // Handle "none" as empty string for the form data
+    const actualJobId = jobId === "none" ? "" : jobId;
+    setFormData(prev => ({ 
+      ...prev, 
+      jobPlanId: actualJobId,
+      completedInfraIds: [], // Reset completions when job changes
+      completedFiberIds: [],
+    }));
+    if (actualJobId) {
+      const selectedJob = jobs.find(j => j.id === actualJobId);
+      if (selectedJob?.locationName && !formData.location) {
+        setFormData(prev => ({ ...prev, location: selectedJob.locationName || "" }));
+      }
+      setShowProgressMap(true); // Show map when job is selected
+    } else {
+      setShowProgressMap(false);
+    }
+  };
+
+  // Handle progress map completion changes
+  const handleCompletionChange = useCallback((infraIds: string[], fiberIds: string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      completedInfraIds: infraIds,
+      completedFiberIds: fiberIds,
+    }));
+  }, []);
 
   const handleAddWorker = () => {
     if (formData.workerInput.trim() && !formData.workers.includes(formData.workerInput.trim())) {
@@ -1246,13 +1354,19 @@ function SubmitReportTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.location.trim()) return;
+    // Location is required unless a job is linked (job provides location context)
+    if (!formData.location.trim() && !formData.jobPlanId) return;
     setSubmitting(true);
 
     try {
+      // Use job location name as fallback if location is empty but job is selected
+      const location = formData.location.trim() || 
+        (formData.jobPlanId ? jobs.find(j => j.id === formData.jobPlanId)?.locationName || "Job site" : "");
+
       const payload = {
         date: formData.date,
-        location: formData.location,
+        location,
+        jobPlanId: formData.jobPlanId || null,
         workersNames: formData.workers,
         workerCount: formData.workers.length,
         hoursWorked: parseFloat(formData.hoursWorked) || 0,
@@ -1271,17 +1385,22 @@ function SubmitReportTab() {
         plowedFootage: formData.plowedFootage ? parseFloat(formData.plowedFootage) : null,
         notes: formData.notes || null,
         issues: formData.issues || null,
+        // Visual progress tracking
+        completedInfraIds: formData.completedInfraIds,
+        completedFiberIds: formData.completedFiberIds,
       };
 
       const response = await fetch("/api/reports/field-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (response.ok) {
         setSuccess(true);
+        setShowProgressMap(false);
         setFormData({
           date: new Date().toISOString().split("T")[0],
-          location: "", workers: [], workerInput: "", hoursWorked: "",
+          location: "", jobPlanId: "", workers: [], workerInput: "", hoursWorked: "",
           strandHungFootage: "", polesAttached: "", fiberLashedFootage: "", fiberPulledFootage: "",
           mstsInstalled: "", risersInstalled: "", spliceCases: "", guysPlaced: "", slackLoops: "",
           handholesPlaced: "", vaultsPlaced: "", drilledFootage: "", plowedFootage: "", notes: "", issues: "",
+          completedInfraIds: [], completedFiberIds: [],
         });
       }
     } catch { /* ignore */ } finally { setSubmitting(false); }
@@ -1310,6 +1429,84 @@ function SubmitReportTab() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Job Selection */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-blue-500" /> Link to Job (Optional)
+            </Label>
+            <Select value={formData.jobPlanId || "none"} onValueChange={handleJobSelect}>
+              <SelectTrigger className={formData.jobPlanId ? "border-blue-200 bg-blue-50/50" : ""}>
+                <SelectValue placeholder={loadingJobs ? "Loading jobs..." : "Select a job to link this report"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No job linked</SelectItem>
+                {jobs.map((job) => (
+                  <SelectItem key={job.id} value={job.id}>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={job.status === "IN_PROGRESS" ? "default" : "secondary"} className="text-xs">
+                        {job.status === "IN_PROGRESS" ? "Active" : "Ready"}
+                      </Badge>
+                      <span>{job.jobName}</span>
+                      {job.locationName && <span className="text-muted-foreground">- {job.locationName}</span>}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {formData.jobPlanId && (
+              <p className="text-xs text-blue-600">
+                This report will automatically sync progress and hours to the linked job.
+              </p>
+            )}
+          </div>
+
+          {/* Progress Map - shown when job is selected */}
+          {formData.jobPlanId && showProgressMap && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <Map className="h-4 w-4 text-emerald-500" /> Visual Progress Tracking
+                </Label>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowProgressMap(false)}
+                  className="text-xs text-muted-foreground"
+                >
+                  Hide Map
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                Tap infrastructure items to mark them as completed today
+              </p>
+              <ProgressMap
+                jobId={formData.jobPlanId}
+                mode="edit"
+                todayCompletedIds={formData.completedInfraIds}
+                onTodayCompletionChange={handleCompletionChange}
+                height="350px"
+              />
+              {(formData.completedInfraIds.length > 0 || formData.completedFiberIds.length > 0) && (
+                <p className="text-xs text-emerald-600 mt-2">
+                  {formData.completedInfraIds.length} infrastructure item(s) will be marked as completed
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Show map button if hidden */}
+          {formData.jobPlanId && !showProgressMap && (
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setShowProgressMap(true)}
+              className="w-full gap-2"
+            >
+              <Map className="h-4 w-4" /> Show Progress Map
+            </Button>
+          )}
+
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1322,10 +1519,13 @@ function SubmitReportTab() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Location / Job Site *</Label>
-            <Input placeholder="e.g., West Mountain Phase 1" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} />
-          </div>
+          {/* Location - only shown when no job is selected */}
+          {!formData.jobPlanId && (
+            <div className="space-y-2">
+              <Label>Location / Job Site *</Label>
+              <Input placeholder="e.g., West Mountain Phase 1" value={formData.location} onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))} />
+            </div>
+          )}
 
           {/* Crew */}
           <div className="space-y-2">
@@ -1405,7 +1605,7 @@ function SubmitReportTab() {
             <Textarea rows={2} placeholder="Any problems, delays, or blockers encountered..." value={formData.issues} onChange={(e) => setFormData(prev => ({ ...prev, issues: e.target.value }))} />
           </div>
 
-          <Button type="submit" className="w-full" disabled={submitting || !formData.location}>
+          <Button type="submit" className="w-full" disabled={submitting || (!formData.location && !formData.jobPlanId)}>
             {submitting ? "Submitting..." : "Submit Daily Log"}
           </Button>
         </form>

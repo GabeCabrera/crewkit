@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { syncFieldLogToJobPlan, resyncFieldLog, removeSyncedJobLogs } from "@/lib/field-job-sync";
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,15 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+          },
+        },
+        jobPlan: {
+          select: {
+            id: true,
+            jobName: true,
+            jobNumber: true,
+            locationName: true,
+            status: true,
           },
         },
       },
@@ -176,6 +186,11 @@ export async function PUT(
       date = new Date(body.date);
     }
 
+    // Check if jobPlanId is changing
+    const oldJobPlanId = existing.jobPlanId;
+    const newJobPlanId = body.jobPlanId !== undefined ? body.jobPlanId : existing.jobPlanId;
+    const jobPlanChanged = oldJobPlanId !== newJobPlanId;
+
     const updated = await prisma.fieldWorkLog.update({
       where: { id: params.id },
       data: {
@@ -185,6 +200,7 @@ export async function PUT(
         workerCount: body.workerCount ?? existing.workerCount,
         hoursWorked: body.hoursWorked ?? existing.hoursWorked,
         teamId: body.teamId !== undefined ? body.teamId : existing.teamId,
+        jobPlanId: newJobPlanId,
         // Aerial metrics
         strandHungFootage: body.strandHungFootage ?? existing.strandHungFootage,
         polesAttached: body.polesAttached ?? existing.polesAttached,
@@ -225,8 +241,31 @@ export async function PUT(
             email: true,
           },
         },
+        jobPlan: {
+          select: {
+            id: true,
+            jobName: true,
+            jobNumber: true,
+            locationName: true,
+            status: true,
+          },
+        },
       },
     });
+
+    // Handle job plan sync
+    try {
+      if (jobPlanChanged) {
+        // Job assignment changed - resync
+        await resyncFieldLog(params.id, oldJobPlanId, newJobPlanId, session.user.id);
+      } else if (newJobPlanId) {
+        // Data changed but same job - update sync
+        await syncFieldLogToJobPlan(params.id, session.user.id);
+      }
+    } catch (syncError) {
+      console.error("Error syncing field log to job plan:", syncError);
+      // Don't fail the request, just log the error
+    }
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -270,6 +309,16 @@ export async function DELETE(
     // Managers can only delete their own team's reports
     if (user.role === "MANAGER" && existing.teamId && existing.teamId !== user.teamId) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
+    // Remove synced job logs before deleting field log
+    if (existing.jobPlanId) {
+      try {
+        await removeSyncedJobLogs(params.id, existing.jobPlanId);
+      } catch (syncError) {
+        console.error("Error removing synced job logs:", syncError);
+        // Continue with deletion even if sync cleanup fails
+      }
     }
 
     await prisma.fieldWorkLog.delete({
