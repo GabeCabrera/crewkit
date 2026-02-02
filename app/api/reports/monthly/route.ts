@@ -212,14 +212,14 @@ export async function GET(request: NextRequest) {
     // ============================================
     // 3b. DERIVED USAGE (from field work)
     // ============================================
-    const fiberPulledFootage = fieldWorkSummary.aerial.fiberPulledFootage;
-    const lashingWireRolls = fiberPulledFootage > 0 ? Math.ceil(fiberPulledFootage / 500) : 0;
+    const strandHungFootage = fieldWorkSummary.aerial.strandHungFootage;
+    const lashingWireRolls = strandHungFootage > 0 ? Math.ceil(strandHungFootage / 500) : 0;
     const derivedUsage = [
       {
         name: "Lashing wire (rolls)",
         quantity: lashingWireRolls,
-        sourceFootage: fiberPulledFootage,
-        formula: "500 ft fiber pulled per roll",
+        sourceFootage: strandHungFootage,
+        formula: "500 ft strand hung per roll",
       },
     ];
 
