@@ -397,6 +397,7 @@ function DailyLogsTab() {
   const [editingLog, setEditingLog] = useState<FieldWorkLog | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingUsageId, setDeletingUsageId] = useState<string | null>(null);
   const [assemblyUsage, setAssemblyUsage] = useState<AssemblyUsageData | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [workerInputValue, setWorkerInputValue] = useState("");
@@ -503,6 +504,28 @@ function DailyLogsTab() {
   const handleOpenDetail = (log: FieldWorkLog) => {
     setSelectedLog(log);
     fetchReportDetail(log.id);
+  };
+
+  const handleRemoveAssemblyUsage = async (logId: string) => {
+    if (!confirm("Remove this assembly usage? Inventory will be restored.")) return;
+    if (!selectedLog) return;
+    setDeletingUsageId(logId);
+    try {
+      const response = await fetch(`/api/assemblies/usage/${logId}`, {
+        method: "DELETE",
+      });
+      if (response.ok) {
+        fetchReportDetail(selectedLog.id);
+      } else {
+        const data = await response.json();
+        alert(data.error || "Failed to remove assembly usage");
+      }
+    } catch (error) {
+      console.error("Error removing assembly usage:", error);
+      alert("Failed to remove assembly usage");
+    } finally {
+      setDeletingUsageId(null);
+    }
   };
 
   const handleOpenEdit = (log: FieldWorkLog) => {
@@ -1025,7 +1048,25 @@ function DailyLogsTab() {
                               <p className="font-medium">{log.assembly.name}</p>
                               <p className="text-xs text-muted-foreground">{log.user.name || log.user.email}</p>
                             </div>
-                            <Badge variant="secondary" className="font-mono">{log.quantity}x</Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="font-mono">{log.quantity}x</Badge>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveAssemblyUsage(log.id);
+                                }}
+                                disabled={deletingUsageId === log.id}
+                              >
+                                {deletingUsageId === log.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
