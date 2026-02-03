@@ -101,12 +101,73 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { modifiers, date } = body;
+    const { modifiers, date, quantity: newQuantityRaw } = body;
     
     // Parse optional date
     const newDate = date 
       ? (date.includes('T') ? new Date(date) : new Date(date + 'T00:00:00.000Z'))
       : undefined;
+
+    // Parse optional quantity
+    const newQuantity = typeof newQuantityRaw === "number" && Number.isInteger(newQuantityRaw) && newQuantityRaw >= 1
+      ? newQuantityRaw
+      : undefined;
+
+    // Handle quantity change: adjust inventory for assembly items
+    if (newQuantity !== undefined && newQuantity !== usageLog.quantity) {
+      const delta = newQuantity - usageLog.quantity;
+      const usageDate = usageLog.date || new Date();
+
+      for (const item of usageLog.assembly.items) {
+        const deltaQty = item.quantity * delta;
+        const inventory = await prisma.inventory.findUnique({
+          where: { equipmentId: item.equipmentId },
+        });
+
+        if (!inventory) continue;
+
+        if (delta < 0) {
+          // Decreasing: restore to inventory
+          await prisma.inventory.update({
+            where: { equipmentId: item.equipmentId },
+            data: { quantity: inventory.quantity + Math.abs(deltaQty) },
+          });
+          await prisma.equipmentLog.create({
+            data: {
+              equipmentId: item.equipmentId,
+              userId: session.user.id,
+              quantity: Math.abs(deltaQty),
+              type: "RETURNED",
+              notes: `Quantity adjusted: ${usageLog.assembly.name}`,
+              date: usageDate,
+            },
+          });
+        } else {
+          // Increasing: deduct from inventory
+          const newStock = inventory.quantity - deltaQty;
+          if (newStock < 0) {
+            return NextResponse.json(
+              { error: `Insufficient inventory for ${item.equipment.name}` },
+              { status: 400 }
+            );
+          }
+          await prisma.inventory.update({
+            where: { equipmentId: item.equipmentId },
+            data: { quantity: newStock },
+          });
+          await prisma.equipmentLog.create({
+            data: {
+              equipmentId: item.equipmentId,
+              userId: session.user.id,
+              quantity: -deltaQty,
+              type: "USED",
+              notes: `Quantity adjusted: ${usageLog.assembly.name}`,
+              date: usageDate,
+            },
+          });
+        }
+      }
+    }
 
     // Get old modifiers
     const oldModifiers = (usageLog.modifiers as any[]) || [];
@@ -173,6 +234,7 @@ export async function PUT(
       data: {
         modifiers: modifiers || null,
         ...(newDate && { date: newDate }),
+        ...(newQuantity !== undefined && { quantity: newQuantity }),
       },
       include: {
         assembly: {

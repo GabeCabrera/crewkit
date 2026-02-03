@@ -398,6 +398,9 @@ function DailyLogsTab() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deletingUsageId, setDeletingUsageId] = useState<string | null>(null);
+  const [editingUsageId, setEditingUsageId] = useState<string | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState<number>(1);
+  const [savingUsageId, setSavingUsageId] = useState<string | null>(null);
   const [assemblyUsage, setAssemblyUsage] = useState<AssemblyUsageData | null>(null);
   const [loadingUsage, setLoadingUsage] = useState(false);
   const [workerInputValue, setWorkerInputValue] = useState("");
@@ -525,6 +528,31 @@ function DailyLogsTab() {
       alert("Failed to remove assembly usage");
     } finally {
       setDeletingUsageId(null);
+    }
+  };
+
+  const handleUpdateAssemblyQuantity = async (logId: string, newQuantity: number) => {
+    if (!selectedLog) return;
+    if (newQuantity < 1) return;
+    setSavingUsageId(logId);
+    try {
+      const response = await fetch(`/api/assemblies/usage/${logId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: newQuantity }),
+      });
+      if (response.ok) {
+        setEditingUsageId(null);
+        fetchReportDetail(selectedLog.id);
+      } else {
+        const data = await response.json();
+        alert(data.error || "Failed to update quantity");
+      }
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+      alert("Failed to update quantity");
+    } finally {
+      setSavingUsageId(null);
     }
   };
 
@@ -1049,23 +1077,79 @@ function DailyLogsTab() {
                               <p className="text-xs text-muted-foreground">{log.user.name || log.user.email}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="font-mono">{log.quantity}x</Badge>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveAssemblyUsage(log.id);
-                                }}
-                                disabled={deletingUsageId === log.id}
-                              >
-                                {deletingUsageId === log.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
+                              {editingUsageId === log.id ? (
+                                <>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={editingQuantity}
+                                    onChange={(e) => setEditingQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                                    className="h-8 w-14 text-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUpdateAssemblyQuantity(log.id, editingQuantity);
+                                    }}
+                                    disabled={savingUsageId === log.id || editingQuantity < 1}
+                                  >
+                                    {savingUsageId === log.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Check className="h-4 w-4 text-emerald-600" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingUsageId(null);
+                                    }}
+                                    disabled={savingUsageId === log.id}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Badge variant="secondary" className="font-mono">{log.quantity}x</Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingUsageId(log.id);
+                                      setEditingQuantity(log.quantity);
+                                    }}
+                                    disabled={deletingUsageId === log.id}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveAssemblyUsage(log.id);
+                                    }}
+                                    disabled={deletingUsageId === log.id}
+                                  >
+                                    {deletingUsageId === log.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))}
